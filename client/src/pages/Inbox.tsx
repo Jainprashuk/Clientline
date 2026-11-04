@@ -2,8 +2,8 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import Layout from '../components/Layout';
 import { useToast } from '../context/ToastContext';
 import {
-  loadInbox, loadThread, checkReplies, snoozeThread, doneThread, reopenThread, setThreadCategory, draftThreadReply, sendThreadReply,
-  type InboxList, type InboxThread, type ReplyCategory,
+  loadInbox, loadThread, loadSentThread, checkReplies, snoozeThread, doneThread, reopenThread, setThreadCategory, draftThreadReply, sendThreadReply,
+  type InboxList, type InboxThread, type ReplyCategory, type SentThread, type SentState,
 } from '../lib/api';
 import { timeAgo } from '../lib/leads';
 
@@ -12,6 +12,38 @@ const gapsIn = (t: string) => [...new Set(t.match(/\[[^\]\n]{1,60}\]/g) || [])];
 
 const day = (n: number) => { const d = new Date(); d.setDate(d.getDate() + n); d.setHours(9, 0, 0, 0); return d; };
 const nextMonday = () => { const d = day(1); while (d.getDay() !== 1) d.setDate(d.getDate() + 1); return d; };
+
+const SENT_TONE: Record<SentState['key'], string> = {
+  replied: 'var(--green)', waiting: 'var(--text2)', 'no-reply': 'var(--text3)', bounced: 'var(--red)', stopped: 'var(--amber)', sent: 'var(--text2)',
+};
+const stepLabel = (m: SentThread['messages'][number]) => (m.kind === 'reply' ? 'Your reply' : m.step === 0 ? 'First email' : `Follow-up ${m.step}`);
+const when = (at: string) => new Date(at).toLocaleString('en-IN', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
+
+/** A thread nobody has answered yet: what you sent, and what happens next. */
+function SentOnly({ leadId, onOpenConversation }: { leadId: string; onOpenConversation: (id: string) => void }) {
+  const toast = useToast();
+  const [t, setT] = useState<SentThread | null>(null);
+  useEffect(() => { setT(null); loadSentThread(leadId).then(setT).catch(e => toast(e.message, 'error')); }, [leadId, toast]);
+  if (!t) return <div className="cl-thread"><div className="empty-state"><i className="ti ti-loader" />Loading…</div></div>;
+  return (
+    <div className="cl-thread">
+      <div style={{ marginBottom: 12 }}>
+        <div style={{ fontWeight: 650, fontSize: 16, color: 'var(--text)' }}>{t.name}{t.company && t.company !== t.name ? <span style={{ fontWeight: 400, color: 'var(--text2)' }}> · {t.company}</span> : null}</div>
+        <div className="cl-row-sub">{t.email} · {t.subject}</div>
+        <div className="cl-hint" style={{ marginTop: 6, color: SENT_TONE[t.state.key] }}>{t.state.label}</div>
+      </div>
+      {t.messages.map((m, i) => (
+        <div key={i} className="cl-msg out">
+          <div className="meta">You · {stepLabel(m)} · {when(m.at)}</div>
+          {m.text || '(no text)'}
+        </div>
+      ))}
+      {t.conversationId
+        ? <button className="btn btn-sm" type="button" onClick={() => onOpenConversation(t.conversationId!)}><i className="ti ti-message" /> Open the conversation</button>
+        : <div className="cl-hint">When they reply, it lands in Needs you and their follow-ups stop. Replies are checked every hour, or press Check for replies.</div>}
+    </div>
+  );
+}
 
 function Thread({ id, categories, onChanged }: { id: string; categories: InboxList['categories']; onChanged: () => void }) {
   const toast = useToast();
@@ -149,7 +181,7 @@ export default function Inbox() {
         <>
           <div className="cl-meta" style={{ marginBottom: 12 }}>
             <div className="cl-toggles" role="group" aria-label="Show">
-              {([['needs', 'Needs you'], ['snoozed', 'Snoozed'], ['all', 'All']] as const).map(([k, label]) => (
+              {([['needs', 'Needs you'], ['snoozed', 'Snoozed'], ['all', 'Replies'], ['sent', 'Sent']] as const).map(([k, label]) => (
                 <button key={k} type="button" className="cl-toggle" aria-pressed={view === k} onClick={() => { setView(k); setOpenId(null); }}>
                   {label} · {data.counts[k]}
                 </button>
@@ -161,7 +193,7 @@ export default function Inbox() {
           {!items.length ? (
             <div className="s-card"><div className="empty-state">
               <i className="ti ti-inbox" />
-              {view === 'needs' ? 'Nothing needs you. Replies to your outreach show up here.' : view === 'snoozed' ? 'Nothing snoozed.' : 'No replies yet. Once someone answers an outreach email, the conversation appears here.'}
+              {view === 'needs' ? 'Nothing needs you. Replies to your outreach show up here.' : view === 'snoozed' ? 'Nothing snoozed.' : view === 'sent' ? 'Nothing sent yet. Emails you send from Outreach show up here, one thread per person.' : 'No replies yet. Once someone answers an outreach email, the conversation appears here.'}
             </div></div>
           ) : (
             <div className="cl-inbox">
@@ -171,11 +203,15 @@ export default function Inbox() {
                     <div className="top"><span className="who">{i.name}</span><span className="when">{timeAgo(i.lastAt)}</span></div>
                     {i.company && i.company !== i.name && <div className="cl-row-sub" style={{ marginTop: 0 }}>{i.company}</div>}
                     <div className="snip">{i.snippet}</div>
-                    {i.category && <span className={`cl-cat${QUIET.includes(i.category) ? ' quiet' : ''}`}>{data.categories[i.category]}</span>}
+                    {i.state
+                      ? <span className="cl-row-sub" style={{ display: 'block', marginTop: 4, color: SENT_TONE[i.state.key] }}>{i.state.label}{i.sentCount && i.sentCount > 1 ? ` · ${i.sentCount} sent` : ''}</span>
+                      : i.category && <span className={`cl-cat${QUIET.includes(i.category) ? ' quiet' : ''}`}>{data.categories[i.category]}</span>}
                   </button>
                 ))}
               </div>
-              {openId ? <Thread id={openId} categories={data.categories} onChanged={load} /> : <div className="cl-thread"><div className="empty-state">Pick a conversation.</div></div>}
+              {!openId ? <div className="cl-thread"><div className="empty-state">Pick a conversation.</div></div>
+                : openId.startsWith('sent-') ? <SentOnly leadId={openId.slice(5)} onOpenConversation={id => setOpenId(id)} />
+                : <Thread id={openId} categories={data.categories} onChanged={load} />}
             </div>
           )}
         </>

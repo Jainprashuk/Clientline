@@ -8,6 +8,7 @@ const mongoose = require('mongoose');
 const Conversation = require('../models/Conversation');
 const SentEmail = require('../models/SentEmail');
 const Lead = require('../models/Lead');
+const Enrollment = require('../models/Enrollment');
 const Settings = require('../models/Settings');
 const mailer = require('../lib/mailer');
 const { checkMailbox } = require('../lib/mailbox/scan');
@@ -17,7 +18,57 @@ const { toHtml } = require('../lib/outreach/send');
 
 const router = express.Router();
 const validId = (id) => mongoose.isValidObjectId(id);
-const VIEWS = { needs: { needsYou: true }, snoozed: { snoozedUntil: { $ne: null } }, all: {} };
+const VIEWS = { sent: null, needs: { needsYou: true }, snoozed: { snoozedUntil: { $ne: null } }, all: {} };
+const DAY_FMT = { day: 'numeric', month: 'short', timeZone: 'Asia/Kolkata' };
+
+/**
+ * Where an emailed person stands, for the Sent view: replied, waiting on the next
+ * follow-up, paused by an out-of-office, bounced, unsubscribed, or finished unanswered.
+ */
+function sentState(convo, enr) {
+  if (convo && convo.lastInboundAt) return { key: 'replied', label: 'Replied' };
+  if (!enr) return { key: 'sent', label: 'Sent' };
+  if (enr.status === 'active') return { key: 'waiting', label: `Waiting · next email ${new Date(enr.nextAt).toLocaleDateString('en-IN', DAY_FMT)}` };
+  if (enr.status === 'paused') return { key: 'waiting', label: `Out of office · resumes ${enr.pausedUntil ? new Date(enr.pausedUntil).toLocaleDateString('en-IN', DAY_FMT) : 'later'}` };
+  if (enr.status === 'done') return { key: 'no-reply', label: 'No reply · sequence finished' };
+  return {
+    bounced: { key: 'bounced', label: 'Bounced' },
+    unsubscribed: { key: 'stopped', label: 'Unsubscribed' },
+    replied: { key: 'replied', label: 'Replied' },
+  }[enr.stopReason] || { key: 'stopped', label: 'Sequence stopped' };
+}
+
+/** Everyone you've emailed, one thread per person, newest first (like Gmail's Sent). */
+async function sentThreads(userId) {
+  const rows = await SentEmail.aggregate([
+    { $match: { userId: new mongoose.Types.ObjectId(String(userId)), leadId: { $ne: null } } },
+    { $sort: { sentAt: 1 } },
+    { $group: { _id: '$leadId', to: { $last: '$to' }, subject: { $first: '$subject' }, text: { $last: '$text' }, lastAt: { $last: '$sentAt' }, count: { $sum: 1 } } },
+    { $sort: { lastAt: -1 } },
+    { $limit: 200 },
+  ]);
+  const leadIds = rows.map(r => r._id);
+  const [leads, convos, enrs] = await Promise.all([
+    Lead.find({ userId, _id: { $in: leadIds } }, { name: 1, person: 1 }).lean(),
+    Conversation.find({ userId, leadId: { $in: leadIds } }, { leadId: 1, lastInboundAt: 1, lastAt: 1, category: 1, unread: 1 }).lean(),
+    Enrollment.find({ userId, leadId: { $in: leadIds } }).sort({ enrolledAt: 1 }).lean(),
+  ]);
+  const lead = new Map(leads.map(l => [String(l._id), l]));
+  const convo = new Map(convos.map(c => [String(c.leadId), c]));
+  const enr = new Map(enrs.map(e => [String(e.leadId), e]));   // the latest one wins
+  return rows.map(r => {
+    const id = String(r._id); const l = lead.get(id); const c = convo.get(id);
+    return {
+      // A thread with a reply opens as the conversation; otherwise the sent-only thread.
+      id: c ? String(c._id) : `sent-${id}`, leadId: id, email: r.to,
+      name: l ? (l.person || l.name) : r.to, company: l ? l.name : '',
+      category: c ? c.category : null, categoryWhy: '', needsYou: false, unread: false,
+      snoozedUntil: null, doneAt: null, lastAt: c && c.lastAt > r.lastAt ? c.lastAt : r.lastAt,
+      snippet: `You: ${String(r.text || r.subject || '').replace(/\s+/g, ' ').slice(0, 150)}`,
+      subject: r.subject, sentCount: r.count, state: sentState(c, enr.get(id)),
+    };
+  });
+}
 
 /** Snoozes that have run out come back to Needs you. */
 const wake = (userId) => Conversation.updateMany({ userId, snoozedUntil: { $lte: new Date() } }, { $set: { snoozedUntil: null, needsYou: true } });
@@ -53,25 +104,53 @@ router.post('/check', async (req, res) => {
 });
 
 router.get('/', async (req, res) => {
-  const view = VIEWS[req.query.view] ? req.query.view : 'needs';
+  const view = req.query.view in VIEWS ? req.query.view : 'needs';
   try {
     await wake(req.userId);
-    const convos = await Conversation.find({ userId: req.userId, ...VIEWS[view] }).sort({ lastAt: -1 }).limit(200).lean();
-    const leads = await Lead.find({ userId: req.userId, _id: { $in: convos.map(c => c.leadId) } }, { name: 1, person: 1 }).lean();
-    const by = new Map(leads.map(l => [String(l._id), l]));
     const uid = req.userId;
-    const [needs, snoozed, all, s] = await Promise.all([
+    let items;
+    if (view === 'sent') items = await sentThreads(uid);
+    else {
+      const convos = await Conversation.find({ userId: uid, ...VIEWS[view] }).sort({ lastAt: -1 }).limit(200).lean();
+      const leads = await Lead.find({ userId: uid, _id: { $in: convos.map(c => c.leadId) } }, { name: 1, person: 1 }).lean();
+      const by = new Map(leads.map(l => [String(l._id), l]));
+      items = convos.map(c => listItem(c, by.get(String(c.leadId))));
+    }
+    const [needs, snoozed, all, sent, s] = await Promise.all([
       Conversation.countDocuments({ userId: uid, needsYou: true }),
       Conversation.countDocuments({ userId: uid, snoozedUntil: { $ne: null } }),
       Conversation.countDocuments({ userId: uid }),
+      SentEmail.distinct('leadId', { userId: uid, leadId: { $ne: null } }).then(ids => ids.length),
       Settings.findOne({ userId: uid }, { mailbox: 1 }).lean(),
     ]);
     res.json({
-      view, items: convos.map(c => listItem(c, by.get(String(c.leadId)))),
-      counts: { needs, snoozed, all },
+      view, items,
+      counts: { needs, snoozed, all, sent },
       categories: CATEGORIES,
       lastCheckAt: s && s.mailbox ? s.mailbox.lastCheckAt : null,
       lastError: s && s.mailbox ? s.mailbox.lastError : null,
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+/** A thread nobody has answered yet: the emails you sent this person, oldest first. */
+router.get('/sent/:leadId', async (req, res) => {
+  if (!validId(req.params.leadId)) return res.status(404).json({ error: 'No such thread' });
+  try {
+    const uid = req.userId; const leadId = req.params.leadId;
+    const [sent, lead, convo, enr] = await Promise.all([
+      SentEmail.find({ userId: uid, leadId }).sort({ sentAt: 1 }).limit(50).lean(),
+      Lead.findOne({ _id: leadId, userId: uid }, { name: 1, person: 1, title: 1, email: 1, service: 1 }).lean(),
+      Conversation.findOne({ userId: uid, leadId }, { _id: 1, lastInboundAt: 1 }).lean(),
+      Enrollment.findOne({ userId: uid, leadId }).sort({ enrolledAt: -1 }).lean(),
+    ]);
+    if (!sent.length) return res.status(404).json({ error: 'No such thread' });
+    res.json({
+      leadId, name: lead ? (lead.person || lead.name) : sent[0].to, company: lead ? lead.name : '', email: sent[sent.length - 1].to,
+      subject: sent[0].subject, conversationId: convo ? String(convo._id) : null, state: sentState(convo, enr),
+      messages: sent.map(m => ({ direction: 'out', from: m.from, subject: m.subject, text: m.text, messageId: m.messageId, at: m.sentAt, step: m.step, kind: m.kind })),
     });
   } catch (err) {
     res.status(500).json({ error: err.message });

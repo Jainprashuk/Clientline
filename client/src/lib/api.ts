@@ -245,9 +245,16 @@ export interface InboxItem {
   id: string; leadId: string; email: string; name: string; company: string;
   category: ReplyCategory | null; categoryWhy: string; needsYou: boolean; unread: boolean;
   snoozedUntil: string | null; doneAt: string | null; lastAt: string; snippet: string;
+  /** Sent view only. */
+  subject?: string; sentCount?: number; state?: SentState;
+}
+export interface SentState { key: 'replied' | 'waiting' | 'no-reply' | 'bounced' | 'stopped' | 'sent'; label: string }
+export interface SentThread {
+  leadId: string; name: string; company: string; email: string; subject: string; conversationId: string | null; state: SentState;
+  messages: (InboxMessage & { step: number | null; kind: 'sequence' | 'reply' })[];
 }
 export interface InboxList {
-  view: 'needs' | 'snoozed' | 'all'; items: InboxItem[]; counts: { needs: number; snoozed: number; all: number };
+  view: 'needs' | 'snoozed' | 'all' | 'sent'; items: InboxItem[]; counts: { needs: number; snoozed: number; all: number; sent: number };
   categories: Record<ReplyCategory, string>; lastCheckAt: string | null; lastError: string | null;
 }
 export interface InboxMessage { direction: 'in' | 'out'; from: string; subject: string; text: string; messageId: string | null; at: string }
@@ -256,6 +263,7 @@ export interface InboxThread extends InboxItem {
   lead: { id: string; name: string; person: string; title: string; email: string; service: string } | null;
 }
 export const loadInbox = (view: InboxList['view']) => apiFetch<InboxList>(`/api/inbox?view=${view}`);
+export const loadSentThread = (leadId: string) => apiFetch<SentThread>(`/api/inbox/sent/${leadId}`);
 export const loadThread = (id: string) => apiFetch<InboxThread>(`/api/inbox/${id}`);
 export const inboxCount = () => apiFetch<{ needsYou: number }>('/api/inbox/count');
 export const checkReplies = (soon = false) => apiFetch<{ ok: boolean; replies: number; bounces: number; skipped?: string; error?: string }>(`/api/inbox/check${soon ? '?soon=1' : ''}`, { method: 'POST' });
