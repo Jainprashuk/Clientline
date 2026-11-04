@@ -151,3 +151,22 @@ export const loadSources = () => apiFetch<SourcesView>('/api/sources');
 export const runSource = (source: RunnableSource) => apiFetch<{ run: SourceRun }>('/api/sources/run', jsonBody({ source }));
 export const previewPaste = (text: string) => apiFetch<PastePreview>('/api/sources/paste/preview', jsonBody({ text }));
 export const importPaste = (text: string) => apiFetch<{ run: SourceRun }>('/api/sources/paste/import', jsonBody({ text }));
+
+// ── Everything a run read ────────────────────────────────────────────────────
+export type RunOutcome = 'lead' | 'held' | 'drop' | 'repeat' | 'updated' | 'capped' | 'added';
+export interface RunItem {
+  id: string; outcome: RunOutcome; reason: string; name: string; text: string; url: string | null;
+  email: string | null; fit: number | null; leadId: string | null; source: LeadSource;
+}
+export interface RunItems {
+  run: SourceRun; items: RunItem[]; total: number; page: number; pages: number;
+  counts: { outcome: Partial<Record<RunOutcome, number>>; reasons: { reason: string; n: number }[] };
+  keptDays: number;
+}
+export function loadRunItems(runId: string, q: { outcome?: RunOutcome | ''; reason?: string; page?: number }) {
+  const p = new URLSearchParams({ page: String(q.page || 1) });
+  if (q.outcome) p.set('outcome', q.outcome);
+  if (q.reason) p.set('reason', q.reason);
+  return apiFetch<RunItems>(`/api/sources/runs/${runId}/items?${p}`);
+}
+export const addRunItem = (id: string) => apiFetch<{ ok: boolean; leadId: string; status: LeadStatus; already: boolean }>(`/api/sources/items/${id}/add`, { method: 'POST' });

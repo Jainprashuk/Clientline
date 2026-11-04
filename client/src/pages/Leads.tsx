@@ -4,6 +4,7 @@ import Layout from '../components/Layout';
 import HoverCard from '../components/HoverCard';
 import LeadDrawer from '../components/LeadDrawer';
 import PasteDrawer from '../components/PasteDrawer';
+import RunResultsDrawer from '../components/RunResultsDrawer';
 import { useToast } from '../context/ToastContext';
 import {
   loadLeads, loadSources, runSource,
@@ -27,7 +28,9 @@ function runSummary(r: SourceRun) {
   return parts.join(' · ');
 }
 
-function FindLeads({ sources, busy, onRun }: { sources: SourcesView | null; busy: RunnableSource | null; onRun: (s: RunnableSource) => void }) {
+function FindLeads({ sources, busy, onRun, onResults }: {
+  sources: SourcesView | null; busy: RunnableSource | null; onRun: (s: RunnableSource) => void; onResults: (runId: string) => void;
+}) {
   const [open, setOpen] = useState(false);
   const navigate = useNavigate();
   const wrap = useRef<HTMLDivElement>(null);
@@ -49,7 +52,8 @@ function FindLeads({ sources, busy, onRun }: { sources: SourcesView | null; busy
             const st = sources?.sources.find(s => s.source === r.source);
             const last = st?.lastRun;
             return (
-              <button key={r.source} type="button" role="menuitem"
+              <div key={r.source}>
+              <button type="button" role="menuitem"
                 onClick={() => {
                   setOpen(false);
                   // Not ready yet: take them to what fixes it rather than a dead button.
@@ -64,6 +68,12 @@ function FindLeads({ sources, busy, onRun }: { sources: SourcesView | null; busy
                   {last && !st?.needs && <small>Last run {timeAgo(last.finishedAt || last.startedAt)}: {last.status === 'failed' ? last.error : runSummary(last)}</small>}
                 </span>
               </button>
+              {last && last.read > 0 && (
+                <button type="button" role="menuitem" className="cl-menu-sub" onClick={() => { setOpen(false); onResults(last.id); }}>
+                  <span><small>See everything the last {st?.label || SOURCE_LABEL[r.source]} run read →</small></span>
+                </button>
+              )}
+              </div>
             );
           })}
         </div>
@@ -89,6 +99,7 @@ export default function Leads() {
   const [pasting, setPasting] = useState(false);
   const [running, setRunning] = useState<RunnableSource | null>(null);
   const [lastRun, setLastRun] = useState<SourceRun | null>(null);
+  const [resultsFor, setResultsFor] = useState<string | null>(null);
 
   // Typing settles for a moment before it searches.
   useEffect(() => { const t = setTimeout(() => { setQuery(q.trim()); setPage(1); }, 300); return () => clearTimeout(t); }, [q]);
@@ -105,6 +116,13 @@ export default function Leads() {
   useEffect(() => { refresh(); }, [refresh]);
   const refreshSources = useCallback(() => loadSources().then(setSources).catch(() => {}), []);
   useEffect(() => { refreshSources(); }, [refreshSources]);
+  // On arrival, show the newest run of the last day, so its results can be opened.
+  useEffect(() => {
+    if (lastRun || !sources) return;
+    const recent = sources.sources.map(s => s.lastRun).filter((r): r is SourceRun => !!r && r.status !== 'running')
+      .sort((a, b) => new Date(b.startedAt).getTime() - new Date(a.startedAt).getTime())[0];
+    if (recent && Date.now() - new Date(recent.startedAt).getTime() < 24 * 3600 * 1000) setLastRun(recent);
+  }, [sources, lastRun]);
 
   const run = async (s: RunnableSource) => {
     setRunning(s);
@@ -148,7 +166,7 @@ export default function Leads() {
       actions={
         <div style={{ display: 'flex', gap: 8 }}>
           <button className="btn" type="button" disabled={!!profileMissing} onClick={() => setPasting(true)}><i className="ti ti-clipboard-text" /> Paste a chat or post</button>
-          <FindLeads sources={sources} busy={running} onRun={run} />
+          <FindLeads sources={sources} busy={running} onRun={run} onResults={setResultsFor} />
         </div>
       }>
       {profileMissing && (
@@ -173,10 +191,11 @@ export default function Leads() {
         </div>
       )}
 
-      {lastRun && lastRun.reasons.length > 0 && (
+      {lastRun && lastRun.read > 0 && (
         <div className="cl-runs" aria-live="polite">
-          <span className="cl-run"><b>{lastRun.label}</b> {runSummary(lastRun)}</span>
-          {lastRun.reasons.slice(0, 4).map(r => <span className="cl-run" key={r.reason}>{r.n} × {r.reason}</span>)}
+          <span className="cl-run"><b>{lastRun.label}</b> {runSummary(lastRun)} · {timeAgo(lastRun.finishedAt || lastRun.startedAt)}</span>
+          {lastRun.reasons.slice(0, 3).map(r => <span className="cl-run" key={r.reason}>{r.n} × {r.reason}</span>)}
+          <button type="button" className="btn btn-xs" onClick={() => setResultsFor(lastRun.id)}><i className="ti ti-list-search" /> See all results</button>
           <button type="button" className="btn btn-xs" aria-label="Hide" onClick={() => setLastRun(null)}><i className="ti ti-x" /></button>
         </div>
       )}
@@ -269,6 +288,11 @@ export default function Leads() {
       )}
 
       {openId && <LeadDrawer id={openId} onClose={() => setOpenId(null)} onChanged={onChanged} />}
+      {resultsFor && (
+        <RunResultsDrawer runId={resultsFor} onClose={() => setResultsFor(null)}
+          onAdded={() => { refresh(); }}
+          onOpenLead={(id) => { setResultsFor(null); setOpenId(id); }} />
+      )}
       {pasting && (
         <PasteDrawer onClose={() => setPasting(false)} onImported={(r) => {
           setPasting(false); setLastRun(r); setStatus('new'); setPage(1); refresh(); refreshSources();

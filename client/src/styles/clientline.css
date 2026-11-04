@@ -108,3 +108,5 @@
 .cl-setup-foot { display: flex; gap: 10px; justify-content: space-between; align-items: center; margin-top: 20px; }
 .cl-range { width: 100%; accent-color: var(--accent); }
 .cl-amount { font-size: 26px; font-weight: 700; font-variant-numeric: tabular-nums; }
+.cl-menu .cl-menu-sub { padding-top: 0; margin-top: -4px; padding-left: 37px; }
+.cl-menu .cl-menu-sub small { color: var(--accent); }

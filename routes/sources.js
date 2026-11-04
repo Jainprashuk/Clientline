@@ -12,7 +12,11 @@ const SourceRun = require('../models/SourceRun');
 const { loadKeys } = require('../lib/searchKeys');
 const { runInline, startRun, finishRun, record, LABELS } = require('../lib/sources/run');
 const { pasteToItems, MAX_TEXT } = require('../lib/sources/paste');
-const { importItems } = require('../lib/leads/import');
+const mongoose = require('mongoose');
+const Lead = require('../models/Lead');
+const RunItem = require('../models/RunItem');
+const { importItems, buildLead } = require('../lib/leads/import');
+const { judge } = require('../lib/leads/gates');
 const { writeOpenersFor } = require('../lib/leads/opener');
 const { aiReady } = require('../lib/ai/keys');
 
@@ -67,6 +71,67 @@ router.get('/runs', async (req, res) => {
   try {
     const runs = await SourceRun.find({ userId: req.userId }).sort({ startedAt: -1 }).limit(Math.min(50, Number(req.query.limit) || 20)).lean();
     res.json({ runs: runs.map(runView) });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+/**
+ * Everything a run read: each item with what happened to it, filterable by outcome
+ * and reason, plus the counts for the filter chips. Kept 14 days (models/RunItem.js).
+ */
+router.get('/runs/:id/items', async (req, res) => {
+  if (!mongoose.isValidObjectId(req.params.id)) return res.status(404).json({ error: 'No such run' });
+  try {
+    const run = await SourceRun.findOne({ _id: req.params.id, userId: req.userId }).lean();
+    if (!run) return res.status(404).json({ error: 'No such run' });
+    const base = { userId: run.userId, runId: run._id };
+    const filter = { ...base };
+    if (RunItem.OUTCOMES.includes(req.query.outcome)) filter.outcome = req.query.outcome;
+    if (req.query.reason) filter.reason = String(req.query.reason).slice(0, 200);
+    const limit = 50;
+    const page = Math.max(1, Number(req.query.page) || 1);
+    const [items, total, byOutcome, byReason] = await Promise.all([
+      RunItem.find(filter, { item: 0 }).sort({ outcome: 1, fit: -1, _id: 1 }).skip((page - 1) * limit).limit(limit).lean(),
+      RunItem.countDocuments(filter),
+      RunItem.aggregate([{ $match: base }, { $group: { _id: '$outcome', n: { $sum: 1 } } }]),
+      RunItem.aggregate([{ $match: { ...base, outcome: 'drop' } }, { $group: { _id: '$reason', n: { $sum: 1 } } }, { $sort: { n: -1 } }]),
+    ]);
+    res.json({
+      run: runView(run),
+      items: items.map(i => ({ id: String(i._id), outcome: i.outcome, reason: i.reason, name: i.name, text: i.text, url: i.url, email: i.email, fit: i.fit, leadId: i.leadId ? String(i.leadId) : null, source: i.source })),
+      total, page, pages: Math.max(1, Math.ceil(total / limit)),
+      counts: {
+        outcome: Object.fromEntries(byOutcome.map(o => [o._id, o.n])),
+        reasons: byReason.map(r => ({ reason: r._id, n: r.n })),
+      },
+      keptDays: RunItem.KEEP_DAYS,
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+/**
+ * "This is a lead": a skipped item becomes a lead anyway. The rules said no, the
+ * user says yes — the lead records both, and the reason stays on the run item so
+ * repeated overrides show which rule is wrong.
+ */
+router.post('/items/:id/add', async (req, res) => {
+  if (!mongoose.isValidObjectId(req.params.id)) return res.status(404).json({ error: 'No such result' });
+  try {
+    const ri = await RunItem.findOne({ _id: req.params.id, userId: req.userId });
+    if (!ri) return res.status(404).json({ error: 'That result has expired or does not exist.' });
+    if (ri.outcome !== 'drop' || !ri.item) return res.status(400).json({ error: 'Only a skipped result can be added.' });
+    const profile = (await Profile.findOne({ userId: req.userId }).lean()) || {};
+    const item = { ...ri.item, postedAt: ri.item.postedAt ? new Date(ri.item.postedAt) : null };
+    const verdict = judge(item, profile, new Date());
+    const lead = buildLead(req.userId, item, { ...verdict, verdict: 'keep', reason: '' }, profile, { runId: ri.runId });
+    lead.fitWhy = [...lead.fitWhy, `Added by you — the rules had skipped it: ${ri.reason}`];
+    const existing = await Lead.findOne({ userId: req.userId, dedupeKey: lead.dedupeKey }).lean();
+    const saved = existing || await Lead.create(lead);
+    await RunItem.updateOne({ _id: ri._id }, { $set: { outcome: 'added', leadId: saved._id, fit: saved.fit } });
+    res.json({ ok: true, leadId: String(saved._id), status: saved.status, already: !!existing });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
