@@ -67,6 +67,8 @@ app.use(requireAuth);
 app.use('/api/auth', authRoutes);
 app.use('/api/connections', require('./routes/connections'));
 app.use('/api/profile', require('./routes/profile'));
+app.use('/api/leads', require('./routes/leads'));
+app.use('/api/sources', require('./routes/sources'));
 
 // ── Pages ───────────────────────────────────────────────────────────────────
 app.get('/login', (_req, res) => res.sendFile(path.join(__dirname, 'login.html')));

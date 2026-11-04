@@ -1,0 +1,98 @@
+#!/usr/bin/env node
+/**
+ * The quality gates and the score, against fixed posts. No network, no database.
+ *
+ *   node scripts/test-gates.js
+ */
+const { judge, placeOf, parseBudget } = require('../lib/leads/gates');
+const { score } = require('../lib/leads/score');
+
+let pass = 0, fail = 0;
+const ok = (m) => { pass++; console.log(`  ok   ${m}`); };
+const bad = (m) => { fail++; console.log(`  FAIL ${m}`); };
+const eq = (got, want, m) => (got === want ? ok(m) : bad(`${m} — got ${JSON.stringify(got)}, want ${JSON.stringify(want)}`));
+
+const NOW = new Date('2026-11-04T10:00:00Z');
+const days = (n) => new Date(NOW - n * 86400000);
+
+const profile = {
+  services: [
+    { name: 'React web apps', keywords: ['react', 'next.js', 'web app', 'frontend'], minBudget: 30000 },
+    { name: 'Landing pages', keywords: ['landing page', 'website'], minBudget: 0 },
+  ],
+  currency: 'INR', rate: 1500, minProject: 25000,
+  clientTypes: ['startups'], locations: ['india'], remoteOk: true,
+  exclusions: ['wordpress', 'equity only'],
+};
+
+const item = (text, extra = {}) => ({
+  source: 'paste', sourceType: 'asked', text, postedAt: days(1),
+  emails: [{ email: 'a@acme.in', confidence: 'high' }], emailConfidence: 'high',
+  signals: [{ text: 'posted', source: 'test', url: null }], ...extra,
+});
+const v = (text, extra) => judge(item(text, extra), profile, NOW);
+
+console.log('Gate 1 — a real client:');
+eq(v('Hi all, I am a freelance React developer available for new projects. DM me!').verdict, 'drop', 'freelancer advertising -> drop');
+eq(v('We offer affordable website design. Our services include React apps.').verdict, 'drop', 'agency pitch -> drop');
+eq(v('React dev here, looking for freelance work and new clients').verdict, 'drop', 'looking for work -> drop');
+eq(v('Our startup is looking for a freelance React developer to build our web app, budget ₹80,000').verdict, 'keep', 'client asking -> keep');
+eq(v('Need help with our Next.js frontend, anyone?').verdict, 'keep', '"need help with" -> keep');
+eq(v('Just shipped a new React web app, so proud of the team').verdict, 'drop', 'no ask -> drop');
+eq(v('Hiring: full-time React developer, CTC 12 LPA, join our team as a frontend engineer').verdict, 'drop', 'full-time job -> drop');
+eq(v('Looking for a React developer, contract role for 3 months, ₹1.5 lakh').verdict, 'keep', 'contract role -> keep');
+eq(v('I am a freelance dev', { ai: { needsFreelancer: true, selfPromo: false } }).reason.includes('services'), true, 'AI reading overrides the regex (then judged on service)');
+
+console.log('\nGate 2 — fresh:');
+eq(v('Looking for a React developer for our web app', { source: 'web-post', postedAt: days(10) }).verdict, 'drop', 'web post 10 days old -> drop');
+eq(v('Looking for a React developer for our web app', { source: 'hn', postedAt: days(30) }).verdict, 'keep', 'HN post 30 days old -> keep');
+eq(v('Looking for a React developer for our web app', { postedAt: null }).verdict, 'keep', 'no date -> neutral');
+
+console.log('\nGate 3 — fits the profile:');
+eq(v('Looking for a Flutter developer for our mobile app').reason, 'Not one of your services', 'other service -> drop');
+eq(v('Need a developer to fix our WordPress website').verdict, 'drop', 'excluded word -> drop');
+eq(v('Looking for a React developer, budget $150').verdict, 'drop', 'budget below minimum -> drop');
+eq(v('Looking for a React developer, budget $2,000 - $5,000').verdict, 'keep', 'budget above minimum -> keep');
+eq(v('Need a React developer for a web app, $8/hr').verdict, 'drop', 'hourly well below rate -> drop');
+eq(v('Looking for a React developer, US only, remote').verdict, 'drop', 'US-only remote -> drop');
+eq(v('Looking for a React developer in Berlin for our web app').verdict, 'drop', 'named elsewhere -> drop');
+eq(v('Looking for a React developer in Bengaluru for our web app').verdict, 'keep', 'named wanted city -> keep');
+eq(v('Looking for a React developer, fully remote, anywhere').verdict, 'keep', 'global remote -> keep');
+eq(judge(item('Looking for a React developer, remote from Germany'), { ...profile, remoteOk: false }, NOW).verdict, 'drop', 'remote from elsewhere with remoteOk off -> drop');
+
+console.log('\nGate 4/5 — reason and reachability:');
+eq(v('Looking for a React developer', { signals: [] }).verdict, 'drop', 'no signal -> drop');
+eq(v('Looking for a React developer', { emails: [] }).verdict, 'held', 'no email -> held');
+
+console.log('\nGate 7 — red flags:');
+eq(v('Looking for a React developer, first an unpaid test task').verdict, 'drop', 'unpaid test -> drop');
+eq(v('Need a React developer, payment after we launch').verdict, 'drop', 'pay after launch -> drop');
+eq(v('Need a React developer urgently, budget ₹30,000').reason, 'Red flag: urgent with a small budget', 'urgent + small budget -> drop');
+
+console.log('\nTriggers (funding news) are judged on the client, not keywords:');
+eq(judge(item('Acme raises $2M seed round to build AI bookkeeping', { source: 'news', sourceType: 'trigger' }), profile, NOW).verdict, 'keep', 'funding headline -> keep');
+
+console.log('\nParsing:');
+eq(parseBudget('budget ₹50,000').inr, 50000, '₹50,000');
+eq(parseBudget('Rs. 1.5 lakh').inr, 150000, 'Rs. 1.5 lakh');
+eq(parseBudget('$2k-$5k').amount, 5000, 'range -> the top');
+eq(parseBudget('3000 USD').currency, 'USD', '3000 USD');
+eq(parseBudget('$40/hr').hourly, true, '$40/hr is hourly');
+eq(parseBudget('Part-time or Contract | $55 - $75/hr').hourly, true, '$55 - $75/hr is hourly throughout');
+eq(v('Looking for a contract React developer, $55 - $75/hr').verdict, 'keep', 'hourly range above rate -> keep');
+eq(parseBudget('founded in 2019 with 12 people'), null, 'no money');
+eq(placeOf('Remote (worldwide)', { locations: ['india'] }), 'global', 'worldwide remote');
+eq(placeOf('Based in Indiana', { locations: ['india'] }), 'unknown', '"Indiana" is not India');
+eq(placeOf('Software Engineer | REMOTE (Canada) | Contract', { locations: ['india', 'remote'] }), 'elsewhere', '"remote" in the profile does not make REMOTE (Canada) wanted');
+
+console.log('\nScore:');
+const it = item('Our startup is looking for a freelance React developer for a Next.js web app, budget ₹80,000, Bengaluru');
+const s = score(it, judge(it, profile, NOW), profile, NOW);
+s.fit >= 75 ? ok(`strong lead scores ${s.fit}`) : bad(`strong lead scored ${s.fit}`);
+s.fitWhy.every(w => /^\+\d+: /.test(w)) ? ok('every point has a reason') : bad('a point without a reason');
+const thin = item('Need help with our frontend', { emails: [], emailConfidence: null, postedAt: null });
+const t = score(thin, judge(thin, profile, NOW), profile, NOW);
+t.fit < 75 ? ok(`thin lead scores ${t.fit}`) : bad(`thin lead scored ${t.fit}`);
+
+console.log(`\n${pass} passed, ${fail} failed\n`);
+if (fail) process.exitCode = 1;
