@@ -4,6 +4,8 @@ Things decided or noticed but parked. Add to it as you go; move an item out when
 
 ## Next up
 
+- **Automatic sending and reply checks (Inngest)** — today you press "Send due emails" and the Inbox checks Gmail when opened. An hourly job per user would send what's due (`lib/outreach/send.js` `sendDue`) and check replies (`lib/mailbox/scan.js` `checkMailbox`) on its own; the same setup as daily lead runs below.
+- **A real Gmail round trip** — Outreach was tested in dry-run (`MAIL_DRY_RUN=1`) and with simulated replies. Still to do once, with your OK: send step 1 to an address you choose, reply, Check for replies, answer from Inbox, click unsubscribe.
 - **Daily automatic runs (Inngest)** — slice 6 of the Leads plan.
   - One Inngest function per source, triggered by an event, `concurrency { limit: 1, key: userId }`, one step per unit (thread / search) so no step nears Vercel's 60 s.
   - Daily crons fan out to users whose profile is complete and who have the source on: news and client posts 08:00 IST, HN on days 1–10 at 07:00 IST. First lines written as a last step.
@@ -37,9 +39,17 @@ Things decided or noticed but parked. Add to it as you go; move an item out when
 - **Notifications** — Outreach raises a bell notice when a key is rejected or out of quota; Clientline only shows it on Free connections. Needs a bell first.
 - **Rotating `CREDENTIAL_KEY`** — today a new key makes every saved key unreadable. A re-encrypt script (decrypt with old, encrypt with new) would make rotation safe.
 
+## Outreach and Inbox
+
+- **Deals and "Start a deal"** from an Inbox reply (wants a quote / a call); a lead in an open deal skips sequences.
+- **Today page** — replies waiting on you, follow-ups due, tasks, Gmail sends today.
+- **A/B subject lines** per sequence, and per-template reply rates.
+- **Send windows and warm-up** — only send on weekday mornings in the lead's time zone; ramp a new Gmail up slowly.
+- **Track the full path per source and template** — contacted → replied → call → won (leads plan §8), now that replies exist.
+
 ## Pages still placeholders
 
-Today, Outreach, Inbox, Deals, Proposals, Invoices, Project boards (see `claudemd/clientline-prototype.html`).
+Today, Deals, Proposals, Invoices, Project boards (see `claudemd/clientline-prototype.html`).
 
 ## Housekeeping
 

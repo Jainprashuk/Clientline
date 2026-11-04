@@ -110,3 +110,26 @@
 .cl-amount { font-size: 26px; font-weight: 700; font-variant-numeric: tabular-nums; }
 .cl-menu .cl-menu-sub { padding-top: 0; margin-top: -4px; padding-left: 37px; }
 .cl-menu .cl-menu-sub small { color: var(--accent); }
+
+/* Inbox: list and thread side by side; stacked on phones. */
+.cl-inbox { display: grid; grid-template-columns: minmax(260px, 340px) 1fr; gap: 14px; align-items: start; }
+.cl-inbox-list { position: sticky; top: 12px; max-height: calc(100vh - 140px); overflow-y: auto; background: var(--bg); border: 1px solid var(--border); border-radius: 14px; overflow: hidden; }
+.cl-inbox-item { display: block; width: 100%; text-align: left; border: 0; border-bottom: 1px solid var(--border); background: none; padding: 11px 14px; cursor: pointer; color: var(--text); font-family: inherit; }
+.cl-inbox-item:hover { background: var(--canvas); }
+.cl-inbox-item.on { background: var(--accent-bg); }
+.cl-inbox-item .top { display: flex; gap: 8px; align-items: baseline; }
+.cl-inbox-item .who { font-weight: 600; font-size: 13.5px; flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cl-inbox-item.unread .who::before { content: ''; display: inline-block; width: 7px; height: 7px; border-radius: 50%; background: var(--accent); margin-right: 6px; vertical-align: 1px; }
+.cl-inbox-item .when { font-size: 11.5px; color: var(--text3); }
+.cl-inbox-item .snip { font-size: 12.5px; color: var(--text2); margin-top: 3px; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.cl-cat { display: inline-block; font-size: 11px; font-weight: 650; padding: 1px 7px; border-radius: 999px; background: var(--accent-bg); color: var(--accent); margin-top: 5px; }
+.cl-cat.quiet { background: var(--canvas); color: var(--text3); }
+.cl-thread { background: var(--bg); border: 1px solid var(--border); border-radius: 14px; padding: 16px 18px; }
+.cl-msg { padding: 12px 14px; border-radius: 12px; margin-bottom: 10px; font-size: 13.5px; line-height: 1.6; white-space: pre-wrap; overflow-wrap: anywhere; }
+.cl-msg.in { background: var(--canvas); }
+.cl-msg.out { background: var(--accent-bg); margin-left: 40px; }
+.cl-msg .meta { font-size: 11.5px; color: var(--text3); margin-bottom: 4px; white-space: normal; }
+.cl-composer textarea { width: 100%; min-height: 150px; resize: vertical; }
+.cl-gap { background: var(--amber-bg); color: var(--amber); border-radius: 6px; padding: 1px 6px; font-size: 12px; font-weight: 600; }
+.tab-badge.cl-nav-badge { margin-left: auto; }
+@media (max-width: 860px) { .cl-inbox { grid-template-columns: 1fr; } .cl-msg.out { margin-left: 16px; } }

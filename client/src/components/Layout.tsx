@@ -5,18 +5,20 @@ import { useSession } from '../context/SessionContext';
 import { SECTIONS, type Section } from '../nav';
 import NavTip from './NavTip';
 import UserMenu from './UserMenu';
+import { inboxCount } from '../lib/api';
 
 // Ported from Outreach's Layout.tsx: same sidebar, top bar, collapse rail and
 // phone drawer, with Clientline's sections.
 
 /** One sidebar link. The label sits in its own span so the collapsed rail can hide it
  *  with CSS, and carries a native tooltip while collapsed since the text is gone. */
-function NavItem({ section, collapsed, onNavigate }: { section: Section; collapsed: boolean; onNavigate: () => void }) {
+function NavItem({ section, collapsed, onNavigate, badge }: { section: Section; collapsed: boolean; onNavigate: () => void; badge?: number }) {
   const { path, icon, label, tip } = section;
   return (
     <NavLink to={path} end={path === '/'} title={collapsed ? label : undefined} aria-label={collapsed ? label : undefined}
       className={({ isActive }) => `nav-item${isActive ? ' active' : ''}`} onClick={onNavigate}>
       <i className={`ti ${icon}`} /> <span className="nav-label">{label}</span>
+      {badge ? <span className="tab-badge cl-nav-badge" title={`${badge} repl${badge === 1 ? 'y needs' : 'ies need'} you`}>{badge}</span> : null}
       <NavTip text={tip} />
     </NavLink>
   );
@@ -39,6 +41,15 @@ export default function Layout({ title, subtitle, actions, children }: {
     try { localStorage.setItem('clientline-sidebar', collapsed ? 'collapsed' : 'open'); } catch { /* private mode */ }
   }, [collapsed]);
   const menuBtnRef = useRef<HTMLButtonElement>(null);
+  // Replies waiting on you, on the Inbox item: on load, and again when you come back to the tab.
+  const [needsYou, setNeedsYou] = useState(0);
+  useEffect(() => {
+    if (!signedIn) return;
+    const refresh = () => { if (document.visibilityState === 'visible') inboxCount().then(r => setNeedsYou(r.needsYou)).catch(() => {}); };
+    refresh();
+    document.addEventListener('visibilitychange', refresh);
+    return () => document.removeEventListener('visibilitychange', refresh);
+  }, [signedIn]);
 
   // A drawer that covers the page has to be dismissable from the keyboard, and
   // focus has to come back to the control that opened it.
@@ -52,7 +63,7 @@ export default function Layout({ title, subtitle, actions, children }: {
   }, [menuOpen]);
 
   const close = () => setMenuOpen(false);
-  const item = (s: Section) => <NavItem key={s.path} section={s} collapsed={collapsed} onNavigate={close} />;
+  const item = (s: Section) => <NavItem key={s.path} section={s} collapsed={collapsed} onNavigate={close} badge={s.path === '/inbox' ? needsYou : undefined} />;
 
   const nav = (
     <>

@@ -222,3 +222,30 @@ export interface SendResult { sent: number; skipped: { name: string; reason: str
 export const loadDue = () => apiFetch<DueSummary>('/api/outreach/due');
 export const sendDueBatch = () => apiFetch<SendResult>('/api/outreach/send', { method: 'POST' });
 export const completeTask = (enrollmentId: string) => apiFetch<{ ok: boolean; due: DueSummary }>(`/api/outreach/tasks/${enrollmentId}/done`, { method: 'POST' });
+
+// ── Inbox ────────────────────────────────────────────────────────────────────
+export type ReplyCategory = 'wants-quote' | 'wants-call' | 'samples' | 'interested' | 'not-now' | 'no' | 'auto';
+export interface InboxItem {
+  id: string; leadId: string; email: string; name: string; company: string;
+  category: ReplyCategory | null; categoryWhy: string; needsYou: boolean; unread: boolean;
+  snoozedUntil: string | null; doneAt: string | null; lastAt: string; snippet: string;
+}
+export interface InboxList {
+  view: 'needs' | 'snoozed' | 'all'; items: InboxItem[]; counts: { needs: number; snoozed: number; all: number };
+  categories: Record<ReplyCategory, string>; lastCheckAt: string | null; lastError: string | null;
+}
+export interface InboxMessage { direction: 'in' | 'out'; from: string; subject: string; text: string; messageId: string | null; at: string }
+export interface InboxThread extends InboxItem {
+  subject: string; messages: InboxMessage[]; bookingUrl: string;
+  lead: { id: string; name: string; person: string; title: string; email: string; service: string } | null;
+}
+export const loadInbox = (view: InboxList['view']) => apiFetch<InboxList>(`/api/inbox?view=${view}`);
+export const loadThread = (id: string) => apiFetch<InboxThread>(`/api/inbox/${id}`);
+export const inboxCount = () => apiFetch<{ needsYou: number }>('/api/inbox/count');
+export const checkReplies = (soon = false) => apiFetch<{ ok: boolean; replies: number; bounces: number; skipped?: string; error?: string }>(`/api/inbox/check${soon ? '?soon=1' : ''}`, { method: 'POST' });
+export const snoozeThread = (id: string, until: string) => apiFetch<{ ok: boolean }>(`/api/inbox/${id}/snooze`, jsonBody({ until }));
+export const doneThread = (id: string) => apiFetch<{ ok: boolean }>(`/api/inbox/${id}/done`, { method: 'POST' });
+export const reopenThread = (id: string) => apiFetch<{ ok: boolean }>(`/api/inbox/${id}/reopen`, { method: 'POST' });
+export const setThreadCategory = (id: string, category: ReplyCategory) => apiFetch<{ ok: boolean }>(`/api/inbox/${id}/category`, jsonBody({ category }, 'PUT'));
+export const draftThreadReply = (id: string) => apiFetch<{ text: string; gaps: string[] }>(`/api/inbox/${id}/draft`, { method: 'POST' });
+export const sendThreadReply = (id: string, text: string) => apiFetch<{ ok: boolean }>(`/api/inbox/${id}/send`, jsonBody({ text }));

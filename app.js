@@ -75,6 +75,7 @@ app.use('/api/profile', require('./routes/profile'));
 app.use('/api/leads', require('./routes/leads'));
 app.use('/api/sources', require('./routes/sources'));
 app.use('/api/outreach', require('./routes/outreach'));
+app.use('/api/inbox', require('./routes/inbox'));
 
 // ── Pages ───────────────────────────────────────────────────────────────────
 app.get('/login', (_req, res) => res.sendFile(path.join(__dirname, 'login.html')));
