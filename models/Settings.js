@@ -37,6 +37,22 @@ const settingsSchema = new mongoose.Schema({
   // Use the keys this user saved in Outreach for any provider without a key here
   // (lib/outreachKeys.js). A key saved here always wins.
   shareOutreach: { type: Boolean, default: true },
+  // Gmail for outreach (lib/mailer.js). The app password is encrypted like the keys
+  // and decrypted only at send time; when empty, the Gmail saved in Outreach is used
+  // (shareOutreach), the same way as the keys.
+  gmailEmail: { type: String, default: '', lowercase: true, trim: true },
+  gmailAppPasswordEnc: { type: String, default: '' },
+  senderName: { type: String, default: '', maxlength: 80 },
+  bookingUrl: { type: String, default: '', maxlength: 300 },
+  // Emails a day across every sequence — well inside Gmail's own limit.
+  sendsPerDay: { type: Number, default: 40, min: 1, max: 300 },
+  // Set when Gmail says the daily limit is reached; sending waits until then.
+  sendingPausedUntil: { type: Date, default: null },
+  mailbox: {
+    lastCheckAt: { type: Date, default: null },
+    scanUntil: { type: Date, default: null },    // lease: one scan at a time
+    lastError: { type: String, default: null },
+  },
   // Keyed by provider: what the last real call with that key said.
   keyStatus: { type: Map, of: keyStatus, default: {} },
   usage: {
@@ -52,6 +68,7 @@ settingsSchema.set('toJSON', {
   transform: (_doc, ret) => {
     delete ret.aiKeys;
     delete ret.searchKeys;
+    delete ret.gmailAppPasswordEnc;
     return ret;
   },
 });

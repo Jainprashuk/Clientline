@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import Layout from '../components/Layout';
+import GmailCard from '../components/GmailCard';
 import { useToast } from '../context/ToastContext';
 import {
   loadConnections, saveKey, removeKey, testKey, setShareOutreach,
@@ -191,6 +192,8 @@ export default function Connections() {
             </div>
           )}
 
+          <GmailCard data={data} onChange={setData} />
+
           <div className="s-card" style={{ marginBottom: 16 }}>
             <div className="s-head">
               <div className="s-head-left">
@@ -246,11 +249,6 @@ export default function Connections() {
                   <span className="sr-ml badge badge-sent" style={{ marginLeft: 'auto' }}>Ready</span>
                 </div>
               ))}
-              <div className="sr-keyhead" style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '6px 0' }}>
-                <i className="ti ti-brand-gmail" style={{ fontSize: 18, color: 'var(--text3)' }} />
-                <span><span className="sr-keyname">Your Gmail</span><div className="sr-keynote" style={{ margin: 0 }}>Sends your outreach from your own address.</div></span>
-                <span className="sr-ml badge badge-pending" style={{ marginLeft: 'auto' }}>Coming with Outreach</span>
-              </div>
             </div>
           </div>
 

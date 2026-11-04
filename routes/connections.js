@@ -18,6 +18,8 @@ const { getUsage } = require('../lib/searchKeys');
 const { testSearchKey } = require('../lib/search');
 const { outreachKeys, forgetOutreach, available: outreachAvailable } = require('../lib/outreachKeys');
 const User = require('../models/User');
+const SentEmail = require('../models/SentEmail');
+const mailer = require('../lib/mailer');
 const { hasApp } = require('../lib/apps');
 
 const router = express.Router();
@@ -62,6 +64,22 @@ async function view(userId) {
     // Groq carries the volume; the others are backups.
     aiReady: ai.groq.inUse,
     outreach: { canShare, on: sharing, found: PROVIDERS.filter(p => !!theirs[p]) },
+    gmail: await gmailView(userId, s),
+  };
+}
+
+/** The Gmail in use (address only), its settings and today's sends. */
+async function gmailView(userId, s) {
+  const info = await mailer.senderInfo(userId).catch(() => null);
+  return {
+    email: info ? info.email : '',
+    from: info ? info.from : null,
+    savedHere: !!(s.gmailEmail && s.gmailAppPasswordEnc),
+    senderName: s.senderName || (info && info.name) || '',
+    bookingUrl: s.bookingUrl || '',
+    sendsPerDay: s.sendsPerDay || 40,
+    sentToday: await SentEmail.sentToday(userId),
+    pausedUntil: s.sendingPausedUntil && s.sendingPausedUntil > new Date() ? s.sendingPausedUntil : null,
   };
 }
 
@@ -105,6 +123,77 @@ router.put('/share', async (req, res) => {
     await Settings.updateOne({ userId: req.userId }, { $set: { shareOutreach: on } });
     forget(req.userId);
     forgetOutreach(req.userId);
+    res.json(await view(req.userId));
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ── Gmail ───────────────────────────────────────────────────────────────────
+const cleanEmail = (v) => String(v || '').trim().toLowerCase();
+const isGmailish = (e) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e);
+
+/** Connect Gmail: the login is checked with Gmail before anything is saved. */
+router.put('/gmail', async (req, res) => {
+  const email = cleanEmail(req.body && req.body.email);
+  // Google shows app passwords as "abcd efgh ijkl mnop"; the spaces are not part of it.
+  const appPassword = String((req.body && req.body.appPassword) || '').replace(/\s+/g, '');
+  if (!isGmailish(email)) return res.status(400).json({ error: 'Enter your Gmail address.' });
+  if (appPassword.length < 12 || appPassword.length > 64) return res.status(400).json({ error: 'That does not look like an app password (16 letters).' });
+  try {
+    await mailer.verify(email, appPassword);
+  } catch (err) {
+    return res.status(400).json({ error: mailer.isAuthError(err)
+      ? 'Gmail refused that address and app password. Check both — it must be an app password, not your normal Gmail password.'
+      : `Could not reach Gmail: ${err.message}` });
+  }
+  try {
+    await Settings.forUser(req.userId);
+    const name = String((req.body && req.body.name) || '').trim().slice(0, 80);
+    await Settings.updateOne({ userId: req.userId }, { $set: {
+      gmailEmail: email, gmailAppPasswordEnc: credentials.encrypt(appPassword), ...(name ? { senderName: name } : {}),
+    } });
+    res.json(await view(req.userId));
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+router.delete('/gmail', async (req, res) => {
+  try {
+    await Settings.updateOne({ userId: req.userId }, { $set: { gmailEmail: '', gmailAppPasswordEnc: '' } });
+    res.json(await view(req.userId));
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+router.post('/gmail/test', async (req, res) => {
+  try {
+    const sender = await mailer.getSender(req.userId);
+    if (!sender) return res.status(400).json({ error: 'No Gmail connected.' });
+    try { await mailer.verify(sender.email, sender.appPassword); }
+    catch (err) { return res.json({ ok: false, error: mailer.isAuthError(err) ? 'Gmail refused the login — the app password may have been revoked.' : err.message, ...(await view(req.userId)) }); }
+    res.json({ ok: true, error: null, ...(await view(req.userId)) });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+/** Sending settings: the name on your emails, booking link, emails per day. */
+router.put('/gmail/settings', async (req, res) => {
+  const b = req.body || {};
+  const $set = {};
+  if (typeof b.senderName === 'string') $set.senderName = b.senderName.replace(/\s+/g, ' ').trim().slice(0, 80);
+  if (typeof b.bookingUrl === 'string') {
+    const u = b.bookingUrl.trim();
+    if (u && !/^https?:\/\/\S+$/i.test(u)) return res.status(400).json({ error: 'The booking link must start with https://' });
+    $set.bookingUrl = u.slice(0, 300);
+  }
+  if (b.sendsPerDay !== undefined) $set.sendsPerDay = Math.min(300, Math.max(1, Math.round(Number(b.sendsPerDay) || 40)));
+  try {
+    await Settings.forUser(req.userId);
+    await Settings.updateOne({ userId: req.userId }, { $set });
     res.json(await view(req.userId));
   } catch (err) {
     res.status(500).json({ error: err.message });

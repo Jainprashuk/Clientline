@@ -43,12 +43,21 @@ export interface Connections {
   usage: { month: string; tavily: number; serpapi: number; caps: Record<SearchProvider, number> };
   aiReady: boolean;
   outreach: { canShare: boolean; on: boolean; found: Provider[] };
+  gmail: GmailView;
   warning?: string | null;
+}
+export interface GmailView {
+  email: string; from: 'clientline' | 'outreach' | null; savedHere: boolean;
+  senderName: string; bookingUrl: string; sendsPerDay: number; sentToday: number; pausedUntil: string | null;
 }
 
 export const loadConnections = () => apiFetch<Connections>('/api/connections');
 export const saveKey = (p: Provider, key: string) => apiFetch<Connections>(`/api/connections/${p}`, jsonBody({ key }, 'PUT'));
 export const removeKey = (p: Provider) => apiFetch<Connections>(`/api/connections/${p}`, { method: 'DELETE' });
+export const connectGmail = (email: string, appPassword: string, name: string) => apiFetch<Connections>('/api/connections/gmail', jsonBody({ email, appPassword, name }, 'PUT'));
+export const disconnectGmail = () => apiFetch<Connections>('/api/connections/gmail', { method: 'DELETE' });
+export const testGmail = () => apiFetch<Connections & { ok: boolean; error: string | null }>('/api/connections/gmail/test', { method: 'POST' });
+export const saveGmailSettings = (b: { senderName?: string; bookingUrl?: string; sendsPerDay?: number }) => apiFetch<Connections>('/api/connections/gmail/settings', jsonBody(b, 'PUT'));
 export const setShareOutreach = (on: boolean) => apiFetch<Connections>('/api/connections/share', jsonBody({ on }, 'PUT'));
 export const testKey = (p: Provider) => apiFetch<Connections & { ok: boolean; error: string | null }>(`/api/connections/${p}/test`, { method: 'POST' });
 
