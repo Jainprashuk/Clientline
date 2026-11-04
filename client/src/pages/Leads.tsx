@@ -68,7 +68,7 @@ function FindLeads({ sources, busy, onRun, onResults }: {
                   {last && !st?.needs && <small>Last run {timeAgo(last.finishedAt || last.startedAt)}: {last.status === 'failed' ? last.error : runSummary(last)}</small>}
                 </span>
               </button>
-              {last && last.read > 0 && (
+              {last && last.read > 0 && last.logged && (
                 <button type="button" role="menuitem" className="cl-menu-sub" onClick={() => { setOpen(false); onResults(last.id); }}>
                   <span><small>See everything the last {st?.label || SOURCE_LABEL[r.source]} run read →</small></span>
                 </button>
@@ -195,7 +195,7 @@ export default function Leads() {
         <div className="cl-runs" aria-live="polite">
           <span className="cl-run"><b>{lastRun.label}</b> {runSummary(lastRun)} · {timeAgo(lastRun.finishedAt || lastRun.startedAt)}</span>
           {lastRun.reasons.slice(0, 3).map(r => <span className="cl-run" key={r.reason}>{r.n} × {r.reason}</span>)}
-          <button type="button" className="btn btn-xs" onClick={() => setResultsFor(lastRun.id)}><i className="ti ti-list-search" /> See all results</button>
+          {lastRun.logged && <button type="button" className="btn btn-xs" onClick={() => setResultsFor(lastRun.id)}><i className="ti ti-list-search" /> See all results</button>}
           <button type="button" className="btn btn-xs" aria-label="Hide" onClick={() => setLastRun(null)}><i className="ti ti-x" /></button>
         </div>
       )}

@@ -59,7 +59,13 @@ export default function RunResultsDrawer({ runId, onClose, onAdded, onOpenLead }
     <Drawer width={720} onClose={onClose}
       title={run ? `${run.label}: everything it read` : 'Results'}
       subtitle={run ? `Run ${timeAgo(run.finishedAt || run.startedAt)} · ${run.read} read, ${checked} checked against your profile · kept ${data!.keptDays} days` : undefined}>
-      {run && run.read > checked && (
+      {run && !run.logged && (
+        <div className="info-box" style={{ marginBottom: 12 }}>
+          <i className="ti ti-info-circle" style={{ fontSize: 15, flexShrink: 0 }} />
+          <div>This run happened before results were saved, so there is nothing to show. Run {run.label} again from Find leads to see everything it reads.</div>
+        </div>
+      )}
+      {run && run.logged && run.read > checked && (
         <div className="cl-hint" style={{ marginTop: 0, marginBottom: 12 }}>
           The other {run.read - checked} {run.source === 'hn' ? 'posts were full-time jobs or freelancers offering work' : run.source === 'news' ? 'headlines weren’t about a company raising money' : 'results weren’t posts'}, so they were set aside before the check and aren’t listed.
         </div>

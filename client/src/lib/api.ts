@@ -138,6 +138,8 @@ export interface SourceRun {
   startedAt: string; finishedAt: string | null; units: number; unitsDone: number;
   read: number; created: number; held: number; updated: number; repeats: number; capped: number; dropped: number;
   credits: number; error: string | null; reasons: { reason: string; n: number }[];
+  /** Its results were saved and can be opened. */
+  logged: boolean;
 }
 export interface SourceStatus { source: LeadSource; label: string; enabled: boolean; needs: string | null; lastRun: SourceRun | null }
 export interface SourcesView { profileComplete: boolean; missing: string[]; aiReady: boolean; sources: SourceStatus[] }

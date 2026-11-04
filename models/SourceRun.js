@@ -29,6 +29,8 @@ const sourceRunSchema = new mongoose.Schema({
   credits: { type: Number, default: 0 },
   reasons: { type: Map, of: Number, default: {} },
   error: { type: String, default: null },
+  // Its items were recorded (models/RunItem.js). False for runs from before that existed.
+  logged: { type: Boolean, default: false },
 }, { versionKey: false });
 
 sourceRunSchema.index({ userId: 1, source: 1, startedAt: -1 });

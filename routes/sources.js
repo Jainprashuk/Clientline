@@ -33,7 +33,7 @@ const runView = (r) => r && ({
   id: String(r._id), source: r.source, label: LABELS[r.source], trigger: r.trigger, status: r.status,
   startedAt: r.startedAt, finishedAt: r.finishedAt, units: r.units, unitsDone: r.unitsDone,
   read: r.read, created: r.created, held: r.held, updated: r.updated, repeats: r.repeats, capped: r.capped, dropped: r.dropped,
-  credits: r.credits, error: r.error,
+  credits: r.credits, error: r.error, logged: r.logged === true,
   reasons: Object.entries(r.reasons instanceof Map ? Object.fromEntries(r.reasons) : (r.reasons || {}))
     .sort((a, b) => b[1] - a[1]).map(([reason, n]) => ({ reason, n })),
 });
