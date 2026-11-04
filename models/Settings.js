@@ -34,6 +34,9 @@ const settingsSchema = new mongoose.Schema({
     tavilyEnc: { type: String, default: '' },
     serpapiEnc: { type: String, default: '' },
   },
+  // Use the keys this user saved in Outreach for any provider without a key here
+  // (lib/outreachKeys.js). A key saved here always wins.
+  shareOutreach: { type: Boolean, default: true },
   // Keyed by provider: what the last real call with that key said.
   keyStatus: { type: Map, of: keyStatus, default: {} },
   usage: {

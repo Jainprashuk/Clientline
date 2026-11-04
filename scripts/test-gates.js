@@ -43,6 +43,11 @@ eq(v('Hiring: full-time React developer, CTC 12 LPA, join our team as a frontend
 eq(v('Looking for a React developer, contract role for 3 months, ₹1.5 lakh').verdict, 'keep', 'contract role -> keep');
 eq(v('I am a freelance dev', { ai: { needsFreelancer: true, selfPromo: false } }).reason.includes('services'), true, 'AI reading overrides the regex (then judged on service)');
 
+eq(v("hello everyone, i'm a full-stack developer who was recently laid off and looking for some quick work in React").verdict, 'drop', 'laid-off developer -> drop');
+eq(v('MSI is an India-based technology development partner offering React web app development').verdict, 'drop', 'agency describing itself -> drop');
+eq(v('We are looking for a skilled ReactJS Developer to design and maintain our web app', { source: 'web-post' }).reason, 'Reads like a job opening, not freelance work', 'web job opening -> drop');
+eq(v('We are looking for a freelance ReactJS developer for a 6 week web app project', { source: 'web-post' }).verdict, 'keep', 'web freelance ask -> keep');
+
 console.log('\nGate 2 — fresh:');
 eq(v('Looking for a React developer for our web app', { source: 'web-post', postedAt: days(10) }).verdict, 'drop', 'web post 10 days old -> drop');
 eq(v('Looking for a React developer for our web app', { source: 'hn', postedAt: days(30) }).verdict, 'keep', 'HN post 30 days old -> keep');

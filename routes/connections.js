@@ -16,6 +16,9 @@ const { KIND } = require('../lib/ai/providers/kinds');
 const { forget, noteResult } = require('../lib/ai/keys');
 const { getUsage } = require('../lib/searchKeys');
 const { testSearchKey } = require('../lib/search');
+const { outreachKeys, forgetOutreach, available: outreachAvailable } = require('../lib/outreachKeys');
+const User = require('../models/User');
+const { hasApp } = require('../lib/apps');
 
 const router = express.Router();
 
@@ -28,20 +31,47 @@ const last4 = (enc) => {
   try { const k = credentials.decrypt(enc) || ''; return k ? k.slice(-4) : ''; } catch (_) { return ''; }
 };
 
+/**
+ * Per provider: whether a key is saved here, and which key is actually in use —
+ * this one, or the user's Outreach key (`from: 'outreach'`) when none is saved here.
+ */
 async function view(userId) {
   const s = await Settings.forUser(userId);
   const status = s.keyStatus ? Object.fromEntries(s.keyStatus) : {};
+  const user = await User.findById(userId, { apps: 1 }).lean();
+  const canShare = outreachAvailable() && hasApp(user, 'outreach');
+  const theirs = canShare ? await outreachKeys(userId) : {};
+  const sharing = canShare && s.shareOutreach !== false;
   const one = (p) => {
     const enc = encOf(s, p);
-    return { saved: !!enc, last4: enc ? last4(enc) : '', status: status[p] || null };
+    const fromOutreach = !enc && sharing && !!theirs[p];
+    return {
+      saved: !!enc,
+      inUse: !!enc || fromOutreach,
+      from: enc ? 'clientline' : fromOutreach ? 'outreach' : null,
+      last4: enc ? last4(enc) : fromOutreach ? theirs[p].slice(-4) : '',
+      inOutreach: !!theirs[p],
+      status: status[p] || null,
+    };
   };
+  const ai = Object.fromEntries(AI_PROVIDERS.map(p => [p, one(p)]));
   return {
-    ai: Object.fromEntries(AI_PROVIDERS.map(p => [p, one(p)])),
+    ai,
     search: Object.fromEntries(SEARCH_PROVIDERS.map(p => [p, one(p)])),
     usage: await getUsage(userId),
     // Groq carries the volume; the others are backups.
-    aiReady: !!encOf(s, 'groq'),
+    aiReady: ai.groq.inUse,
+    outreach: { canShare, on: sharing, found: PROVIDERS.filter(p => !!theirs[p]) },
   };
+}
+
+/** The key a provider is using now: saved here, else the Outreach one. '' when none. */
+async function keyInUse(userId, provider) {
+  const s = await Settings.forUser(userId);
+  const enc = encOf(s, provider);
+  if (enc) { try { return credentials.decrypt(enc) || ''; } catch (_) { return ''; } }
+  if (s.shareOutreach === false) return '';
+  return (await outreachKeys(userId))[provider] || '';
 }
 
 /** One tiny call with this key. Resolves { ok, kind, error }. */
@@ -61,6 +91,20 @@ const validKey = (k) => typeof k === 'string' && k.trim().length >= 10 && k.trim
 
 router.get('/', async (req, res) => {
   try {
+    res.json(await view(req.userId));
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+/** Use (or stop using) the keys saved in Outreach for providers without a key here. */
+router.put('/share', async (req, res) => {
+  const on = !!(req.body && req.body.on);
+  try {
+    await Settings.forUser(req.userId);
+    await Settings.updateOne({ userId: req.userId }, { $set: { shareOutreach: on } });
+    forget(req.userId);
+    forgetOutreach(req.userId);
     res.json(await view(req.userId));
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -94,12 +138,8 @@ router.post('/:provider/test', async (req, res) => {
   const { provider } = req.params;
   if (!PROVIDERS.includes(provider)) return res.status(404).json({ error: 'Unknown connection' });
   try {
-    const s = await Settings.forUser(req.userId);
-    const enc = encOf(s, provider);
-    if (!enc) return res.status(400).json({ error: 'No key saved for this connection.' });
-    let key = '';
-    try { key = credentials.decrypt(enc); } catch (_) { /* rotated CREDENTIAL_KEY */ }
-    if (!key) return res.status(400).json({ error: 'The saved key can no longer be read — add it again.' });
+    const key = await keyInUse(req.userId, provider);
+    if (!key) return res.status(400).json({ error: 'No key in use for this connection — add one.' });
     const t = await testKey(req.userId, provider, key);
     const state = t.ok ? 'ok' : t.kind === KIND.AUTH ? 'invalid' : 'quota';
     await Settings.updateOne({ userId: req.userId }, { $set: { [`keyStatus.${provider}`]: { state, checkedAt: new Date(), error: t.ok ? null : String(t.error || '').slice(0, 300) } } });
