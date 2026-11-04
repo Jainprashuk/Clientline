@@ -3,6 +3,12 @@ import { Navigate, Route, Routes } from 'react-router-dom';
 import { useSession } from './context/SessionContext';
 import { SECTIONS } from './nav';
 import ComingSoon from './pages/ComingSoon';
+import Connections from './pages/Connections';
+
+// Built sections; every other one is still a ComingSoon placeholder.
+const PAGES: Record<string, () => JSX.Element> = {
+  '/connections': Connections,
+};
 
 // Signed-out visitors go to the login page, which is served outside the SPA,
 // so a router <Navigate> cannot reach it.
@@ -28,7 +34,7 @@ export default function App() {
   return (
     <Routes>
       {SECTIONS.map(s => (
-        <Route key={s.path} path={s.path} element={<SignedIn><ComingSoon section={s} /></SignedIn>} />
+        <Route key={s.path} path={s.path} element={<SignedIn>{(() => { const Page = PAGES[s.path]; return Page ? <Page /> : <ComingSoon section={s} />; })()}</SignedIn>} />
       ))}
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>

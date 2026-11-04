@@ -65,6 +65,7 @@ app.use('/api/auth', async (_req, res, next) => {
 });
 app.use(requireAuth);
 app.use('/api/auth', authRoutes);
+app.use('/api/connections', require('./routes/connections'));
 
 // ── Pages ───────────────────────────────────────────────────────────────────
 app.get('/login', (_req, res) => res.sendFile(path.join(__dirname, 'login.html')));
