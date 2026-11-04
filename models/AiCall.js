@@ -11,7 +11,7 @@ const mongoose = require('mongoose');
  *
  * Rows expire after 30 days: full prompts are large, and the M0 tier is 512 MB.
  */
-const FEATURES = ['readposts', 'opener', 'keytest', 'other'];
+const FEATURES = ['readposts', 'opener', 'keytest', 'replysort', 'draft', 'other'];
 
 const aiCallSchema = new mongoose.Schema({
   userId: { type: mongoose.Schema.Types.ObjectId, default: null },

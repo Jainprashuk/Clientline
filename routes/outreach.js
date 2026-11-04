@@ -14,6 +14,7 @@ const Settings = require('../models/Settings');
 const { renderStep, whyBlocked, variablesIn, VARIABLES, STARTER } = require('../lib/outreach/render');
 const { enroll, stop, forLead } = require('../lib/outreach/enroll');
 const { sendDue, dueSummary, completeTask } = require('../lib/outreach/send');
+const { checkMailbox } = require('../lib/mailbox/scan');
 
 const router = express.Router();
 const validId = (id) => mongoose.isValidObjectId(id);
@@ -218,8 +219,11 @@ router.get('/due', async (req, res) => {
 /** One batch, sized to finish inside a request. The page calls again while `more` is true. */
 router.post('/send', async (req, res) => {
   try {
+    // Replies first, so nobody who answered gets a follow-up. At most every two minutes,
+    // since the page sends batch after batch.
+    const mail = await checkMailbox(req.userId, { minIntervalMs: 2 * 60 * 1000, budgetMs: 15_000 }).catch(err => ({ ok: false, error: err.message }));
     const r = await sendDue(req.userId);
-    res.json({ ...r, due: await dueSummary(req.userId) });
+    res.json({ ...r, mailbox: mail, due: await dueSummary(req.userId) });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
