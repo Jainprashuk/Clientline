@@ -11,8 +11,10 @@
  * blocklist entries made while testing, so nothing can follow up on a real company,
  * and puts those leads back in New. Removes the placeholder Gmail so you connect yours.
  * Seed: three test leads in New, each with a first line:
- *   - "Test · Acme Labs"      → prashuk.jain@strideone.in  (reply from here to test Inbox)
- *   - "Test · Brightside"     → 29jainprashuk+clientline@gmail.com (lands in your own Gmail)
+ * Send FROM 29jainprashuk@gmail.com (connect it in Free connections); the leads go TO the
+ * owner's second account, so replies come from a different address, as a client's would:
+ *   - "Test · Acme Labs"      → prashukjain2905@gmail.com  (reply from here to test Inbox)
+ *   - "Test · Brightside"     → prashukjain2905+brightside@gmail.com (same inbox, a second lead)
  *   - "Test · Bounce check"   → an address that doesn't exist, to see a bounce handled
  * plus a held lead (no email). Refuses to run against production.
  */
@@ -38,12 +40,12 @@ const now = new Date();
 
 const TEST_LEADS = [
   {
-    name: 'Test · Acme Labs', person: 'Prashuk Test', title: 'Founder', email: 'prashuk.jain@strideone.in',
+    name: 'Test · Acme Labs', person: 'Prashuk Test', title: 'Founder', email: 'prashukjain2905@gmail.com',
     about: 'Test lead. Our startup is looking for a freelance React developer to build our customer web app. Budget around ₹80,000.',
     opener: 'You posted that your startup needs a freelance React developer for your customer web app, and that is exactly the work I do.',
   },
   {
-    name: 'Test · Brightside', person: 'Prashuk Gmail', title: 'Owner', email: '29jainprashuk+clientline@gmail.com',
+    name: 'Test · Brightside', person: 'Prashuk Gmail', title: 'Owner', email: 'prashukjain2905+brightside@gmail.com',
     about: 'Test lead. Need help with our Next.js frontend for the online store.',
     opener: 'You mentioned your Next.js frontend for the online store needs help — I build and speed up Next.js stores.',
   },
