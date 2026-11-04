@@ -13,6 +13,8 @@ const { loadKeys } = require('../lib/searchKeys');
 const { runInline, startRun, finishRun, record, LABELS } = require('../lib/sources/run');
 const { pasteToItems, MAX_TEXT } = require('../lib/sources/paste');
 const { importItems } = require('../lib/leads/import');
+const { writeOpenersFor } = require('../lib/leads/opener');
+const { aiReady } = require('../lib/ai/keys');
 
 const router = express.Router();
 const RUNNABLE = ['hn', 'news', 'web-post'];
@@ -47,6 +49,7 @@ router.get('/', async (req, res) => {
     res.json({
       profileComplete: missing.length === 0,
       missing,
+      aiReady: (await aiReady(req.userId)).ready,
       sources: [...RUNNABLE, 'paste'].map((s, i) => ({
         source: s,
         label: LABELS[s],
@@ -99,7 +102,7 @@ router.post('/paste/preview', async (req, res) => {
     const { missing, profile } = await profileOrError(req.userId);
     if (missing.length) return res.status(400).json({ error: `Finish My profile first: add ${missing.join(', ')}.`, code: 'PROFILE_INCOMPLETE' });
     const { items, messages } = pasteToItems(text);
-    const r = await importItems(req.userId, items, profile, { dryRun: true });
+    const r = await importItems(req.userId, items, profile, { dryRun: true, aiRead: true });
     res.json({ messages, considered: items.length, kept: r.kept, held: r.held, dropped: r.dropped, reasons: r.reasons, preview: r.preview.slice(0, 200) });
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -118,9 +121,10 @@ router.post('/paste/import', async (req, res) => {
     await SourceRun.updateOne({ _id: run._id }, { $set: { units: 1 } });
     try {
       const { items, messages } = pasteToItems(text);
-      const r = await importItems(req.userId, items, profile, { runId: run._id });
+      const r = await importItems(req.userId, items, profile, { runId: run._id, aiRead: true });
       r.read = messages;
       await record(run._id, r, { unit: true });
+      await writeOpenersFor(req.userId, r.leadIds, { max: 5, deadline: Date.now() + 30_000 }).catch(() => {});
       res.json({ run: runView(await finishRun(run._id, { worked: true })) });
     } catch (err) {
       await finishRun(run._id, { error: err.message });

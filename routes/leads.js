@@ -9,6 +9,7 @@ const express = require('express');
 const mongoose = require('mongoose');
 const Lead = require('../models/Lead');
 const { WEAK } = require('../lib/leads/score');
+const { writeOpener } = require('../lib/leads/opener');
 
 const { STATUSES, SOURCES, DISCARD_REASONS } = Lead;
 const router = express.Router();
@@ -115,6 +116,19 @@ router.post('/bulk', async (req, res) => {
   try {
     const r = await decide(req.userId, list, action, reason);
     res.json({ ok: true, changed: r.modifiedCount });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+/** Write (or rewrite) the first line now, on the user's own AI key. */
+router.post('/:id/opener', async (req, res) => {
+  if (!validId(req.params.id)) return res.status(404).json({ error: 'No such lead' });
+  try {
+    const r = await writeOpener(req.userId, req.params.id);
+    if (!r.lead) return res.status(404).json({ error: 'No such lead' });
+    if (r.noKeys) return res.status(400).json({ error: r.error, code: 'AI_KEY_REQUIRED' });
+    res.json({ ...shape(r.lead), ok: r.ok, writeError: r.ok ? null : r.error });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }

@@ -135,6 +135,13 @@ export default function Leads() {
         </div>
       )}
 
+      {sources && sources.profileComplete && !sources.aiReady && (
+        <div className="info-box" style={{ marginBottom: 14 }}>
+          <i className="ti ti-sparkles" style={{ fontSize: 15, flexShrink: 0 }} />
+          <div>Leads are found without AI, but first lines need a free Groq key. Add one in <Link to="/connections">Free connections</Link> (or in Outreach — Clientline uses it too).</div>
+        </div>
+      )}
+
       {lastRun && lastRun.reasons.length > 0 && (
         <div className="cl-runs" aria-live="polite">
           <span className="cl-run"><b>{lastRun.label}</b> {runSummary(lastRun)}</span>

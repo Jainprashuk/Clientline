@@ -76,6 +76,7 @@ eq(v('Need a React developer urgently, budget ₹30,000').reason, 'Red flag: urg
 
 console.log('\nTriggers (funding news) are judged on the client, not keywords:');
 eq(judge(item('Acme raises $2M seed round to build AI bookkeeping', { source: 'news', sourceType: 'trigger' }), profile, NOW).verdict, 'keep', 'funding headline -> keep');
+eq(judge(item('Acme raises $2M seed round to build AI bookkeeping', { source: 'news', sourceType: 'trigger' }), profile, NOW).budget, null, 'a funding round is not a project budget');
 
 console.log('\nParsing:');
 eq(parseBudget('budget ₹50,000').inr, 50000, '₹50,000');

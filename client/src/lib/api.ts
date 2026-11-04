@@ -125,6 +125,7 @@ export function loadLeads(q: LeadQuery) {
 }
 export const loadLead = (id: string) => apiFetch<Lead>(`/api/leads/${id}`);
 export const saveOpener = (id: string, opener: string) => apiFetch<Lead>(`/api/leads/${id}`, jsonBody({ opener }, 'PATCH'));
+export const writeLeadOpener = (id: string) => apiFetch<Lead & { ok: boolean; writeError: string | null }>(`/api/leads/${id}/opener`, { method: 'POST' });
 export const approveLead = (id: string) => apiFetch<Lead>(`/api/leads/${id}/approve`, { method: 'POST' });
 export const restoreLead = (id: string) => apiFetch<Lead>(`/api/leads/${id}/restore`, { method: 'POST' });
 export const discardLead = (id: string, reason: DiscardReason) => apiFetch<Lead>(`/api/leads/${id}/discard`, jsonBody({ reason }));
@@ -139,7 +140,7 @@ export interface SourceRun {
   credits: number; error: string | null; reasons: { reason: string; n: number }[];
 }
 export interface SourceStatus { source: LeadSource; label: string; enabled: boolean; needs: string | null; lastRun: SourceRun | null }
-export interface SourcesView { profileComplete: boolean; missing: string[]; sources: SourceStatus[] }
+export interface SourcesView { profileComplete: boolean; missing: string[]; aiReady: boolean; sources: SourceStatus[] }
 export interface PastePreviewRow {
   name: string; text: string; verdict: 'new' | 'held' | 'drop'; reason: string;
   fit?: number; fitWhy?: string[]; email?: string | null; emailConfidence?: string | null; service?: string;

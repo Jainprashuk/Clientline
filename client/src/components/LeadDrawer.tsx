@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import Drawer from './Drawer';
 import { useToast } from '../context/ToastContext';
 import {
-  loadLead, saveOpener, approveLead, discardLead, restoreLead,
+  loadLead, saveOpener, approveLead, discardLead, restoreLead, writeLeadOpener,
   type DiscardReason, type Lead,
 } from '../lib/api';
 import { CONFIDENCE, DISCARD_LABEL, SOURCE_LABEL, STATUS_LABEL, fitClass, timeAgo } from '../lib/leads';
@@ -23,6 +23,7 @@ export default function LeadDrawer({ id, onClose, onChanged }: {
   const [error, setError] = useState<string | null>(null);
   const [opener, setOpener] = useState('');
   const [busy, setBusy] = useState(false);
+  const [writing, setWriting] = useState(false);
   const [reason, setReason] = useState<DiscardReason | ''>('');
 
   useEffect(() => {
@@ -38,6 +39,18 @@ export default function LeadDrawer({ id, onClose, onChanged }: {
       toast(done, 'success');
     } catch (e: any) { toast(e.message, 'error'); }
     finally { setBusy(false); }
+  };
+
+  const write = async () => {
+    if (!lead) return;
+    if (openerDirty && !window.confirm('Replace your unsaved edit with a new line?')) return;
+    setWriting(true);
+    try {
+      const l = await writeLeadOpener(lead.id);
+      setLead(l); setOpener(l.opener || ''); onChanged(l);
+      if (!l.ok) toast(`No line could be written from these facts: ${l.writeError}`, 'info', 7000);
+    } catch (e: any) { toast(e.message, 'error', 7000); }
+    finally { setWriting(false); }
   };
 
   const openerDirty = !!lead && opener.trim() !== (lead.opener || '').trim();
@@ -143,15 +156,23 @@ export default function LeadDrawer({ id, onClose, onChanged }: {
 
           <div className="cl-sect">
             <h3>Suggested first line</h3>
-            <textarea className="cl-opener" aria-label="First line" maxLength={600} value={opener}
-              placeholder={lead.openerState === 'failed' ? 'No first line could be written from the facts above.' : 'Write the first line of your email. AI-written lines arrive once you add a Groq key.'}
+            <textarea className="cl-opener" aria-label="First line" maxLength={600} value={opener} disabled={writing}
+              placeholder={writing ? 'Writing from the facts above…' : 'Write the first line of your email, or let AI draft one from the facts above.'}
               onChange={e => setOpener(e.target.value)} />
-            <div className="cl-meta" style={{ marginTop: 6 }}>
-              {lead.openerState === 'written' && <span>Written only from the sources above and your profile. Check each fact before sending.</span>}
-              {lead.openerState === 'edited' && <span>Your edit.</span>}
+            {lead.openerState === 'written' && lead.openerSources && lead.openerSources.length > 0 && !openerDirty && (
+              <div className="cl-row-sub">Built from: {lead.openerSources.join(' · ')}. Check each fact before sending.</div>
+            )}
+            {lead.openerState === 'failed' && !opener && (
+              <div className="cl-note">No line was written: every draft used something that isn’t in the facts above, so none was kept. Write your own, or try again.</div>
+            )}
+            <div className="cl-meta" style={{ marginTop: 8 }}>
+              <button className="btn btn-sm" type="button" disabled={writing || busy} onClick={write}>
+                {writing ? <><i className="ti ti-loader" /> Writing…</> : <><i className="ti ti-sparkles" /> {lead.opener ? 'Write again' : 'Write a first line'}</>}
+              </button>
+              {lead.openerState === 'edited' && !openerDirty && <span>Your edit.</span>}
               <span className="spacer" style={{ flex: 1 }} />
               {openerDirty && (
-                <button className="btn btn-sm" type="button" disabled={busy}
+                <button className="btn btn-sm btn-primary" type="button" disabled={busy || writing}
                   onClick={() => act(() => saveOpener(lead.id, opener), 'First line saved.')}>Save line</button>
               )}
             </div>
