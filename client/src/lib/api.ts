@@ -181,3 +181,21 @@ export function loadRunItems(runId: string, q: { outcome?: RunOutcome | ''; reas
   return apiFetch<RunItems>(`/api/sources/runs/${runId}/items?${p}`);
 }
 export const addRunItem = (id: string) => apiFetch<{ ok: boolean; leadId: string; status: LeadStatus; already: boolean }>(`/api/sources/items/${id}/add`, { method: 'POST' });
+
+// ── Outreach: sequences ──────────────────────────────────────────────────────
+export interface SeqStep { kind: 'email' | 'task'; dayOffset: number; subject: string; body: string }
+export interface SeqStats {
+  people: number; active: number; done: number; replied: number; bounced: number; unsubscribed: number;
+  sent: Record<string, number>; repliedAt: Record<string, number>;
+}
+export interface Sequence { id: string; name: string; active: boolean; newPerDay: number; steps: SeqStep[]; stats: SeqStats | null }
+export interface Variable { key: string; label: string }
+export interface StepPreview { ok: boolean; subject?: string | null; body?: string; why?: string }
+
+export const loadSequences = () => apiFetch<{ sequences: Sequence[]; variables: Variable[] }>('/api/outreach/sequences');
+export const createSequence = (name: string) => apiFetch<Sequence>('/api/outreach/sequences', jsonBody({ name }));
+export const updateSequence = (id: string, patch: Partial<Pick<Sequence, 'name' | 'active' | 'newPerDay' | 'steps'>>) =>
+  apiFetch<Sequence>(`/api/outreach/sequences/${id}`, jsonBody(patch, 'PUT'));
+export const deleteSequence = (id: string) => apiFetch<{ ok: boolean }>(`/api/outreach/sequences/${id}`, { method: 'DELETE' });
+export const previewSequence = (steps: SeqStep[], leadId?: string) =>
+  apiFetch<{ lead: { id: string; name: string; person: string } | null; steps: StepPreview[] }>('/api/outreach/sequences/preview', jsonBody({ steps, leadId }));

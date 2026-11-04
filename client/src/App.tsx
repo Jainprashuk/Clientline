@@ -7,12 +7,14 @@ import Connections from './pages/Connections';
 import Profile from './pages/Profile';
 import Leads from './pages/Leads';
 import Setup from './pages/Setup';
+import Outreach from './pages/Outreach';
 
 // Built sections; every other one is still a ComingSoon placeholder.
 const PAGES: Record<string, () => JSX.Element> = {
   '/connections': Connections,
   '/profile': Profile,
   '/leads': Leads,
+  '/outreach': Outreach,
 };
 
 // Signed-out visitors go to the login page, which is served outside the SPA,
