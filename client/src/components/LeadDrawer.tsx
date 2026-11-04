@@ -108,14 +108,10 @@ export default function LeadDrawer({ id, onClose, onChanged }: {
       </>
     ) : lead.status === 'new' || lead.status === 'held' ? (
       <>
-        {lead.status === 'new' && canSend
-          ? <AddToSequence leadIds={[lead.id]} compact onAdded={(a) => { if (a.length) reload(); }} />
-          : <button className="btn btn-primary btn-sm" type="button" disabled={busy || lead.status === 'held'}
-              title={lead.status === 'held' ? 'Find an email for them first' : 'Keep it for later'}
-              onClick={() => act(() => approveLead(lead.id), 'Approved.')}><i className="ti ti-check" /> Approve</button>}
-        {lead.status === 'new' && canSend && (
-          <button className="btn btn-sm" type="button" disabled={busy} onClick={() => act(() => approveLead(lead.id), 'Approved — saved for later.')}>Approve</button>
-        )}
+        {/* Approving is the gate into outreach: only approved leads can be added to a sequence. */}
+        <button className="btn btn-primary btn-sm" type="button" disabled={busy || lead.status === 'held'}
+          title={lead.status === 'held' ? 'Find an email for them first' : 'Approve, then add it to a sequence'}
+          onClick={() => act(() => approveLead(lead.id), 'Approved — now add it to a sequence.')}><i className="ti ti-check" /> Approve</button>
         <span className="spacer" />
         {discardControls}
       </>

@@ -7,6 +7,7 @@ import PasteDrawer from '../components/PasteDrawer';
 import RunResultsDrawer from '../components/RunResultsDrawer';
 import AddToSequence from '../components/AddToSequence';
 import { useToast } from '../context/ToastContext';
+import { apiFetch, jsonBody } from '../lib/api';
 import {
   loadLeads, loadSources, runSource,
   type Lead, type LeadList, type LeadSource, type LeadStatus, type RunnableSource, type SourceRun, type SourcesView,
@@ -110,14 +111,23 @@ export default function Leads() {
   // Typing settles for a moment before it searches.
   useEffect(() => { const t = setTimeout(() => { setQuery(q.trim()); setPage(1); }, 300); return () => clearTimeout(t); }, [q]);
 
+  // Which view the shown rows belong to. Switching tab, source or search shows loading
+  // rows instead of the previous view's leads; only the newest request may land.
+  const viewKey = `${status}|${source}|${query}|${hideWeak}`;
+  const [shownKey, setShownKey] = useState('');
+  const reqSeq = useRef(0);
   const refresh = useCallback(async () => {
+    const seq = ++reqSeq.current;
     setLoading(true);
     try {
-      setList(await loadLeads({ status, source, q: query, hideWeak: hideWeak && (status === 'new' || status === 'held'), page }));
+      const data = await loadLeads({ status, source, q: query, hideWeak: hideWeak && (status === 'new' || status === 'held'), page });
+      if (seq !== reqSeq.current) return;
+      setList(data); setShownKey(`${status}|${source}|${query}|${hideWeak}`);
       setError(null);
-    } catch (e: any) { setError(e.message); }
-    finally { setLoading(false); }
+    } catch (e: any) { if (seq === reqSeq.current) setError(e.message); }
+    finally { if (seq === reqSeq.current) setLoading(false); }
   }, [status, source, query, hideWeak, page]);
+  const switching = loading && shownKey !== viewKey;
 
   useEffect(() => { refresh(); }, [refresh]);
   const refreshSources = useCallback(() => loadSources().then(setSources).catch(() => {}), []);
@@ -238,7 +248,7 @@ export default function Leads() {
         )}
       </div>
 
-      <div className={`table-card lr-table cl-table${loading ? ' refreshing-wrap is-refreshing' : ''}`}>
+      <div className={`table-card lr-table cl-table refreshing-wrap${loading && !switching ? ' is-refreshing' : ''}`} aria-busy={loading}>
         <table>
           <thead>
             <tr>
@@ -254,7 +264,12 @@ export default function Leads() {
           </thead>
           <tbody>
             {error && <tr><td colSpan={selectable ? 7 : 6}><div className="empty-state"><i className="ti ti-alert-triangle" />{error}</div></td></tr>}
-            {!error && list && !list.leads.length && (
+            {switching && !error && [0, 1, 2, 3].map(i => (
+              <tr key={`sk-${i}`} aria-hidden="true" className="cl-skel-row">
+                <td colSpan={selectable ? 7 : 6}><span className="cl-skel" style={{ width: `${70 - i * 12}%` }} /></td>
+              </tr>
+            ))}
+            {!switching && !error && list && !list.leads.length && (
               <tr><td colSpan={selectable ? 7 : 6}><div className="empty-state">
                 <i className="ti ti-target-arrow" />
                 {query || source ? 'No leads match. Clear the search or pick All sources.'
@@ -265,7 +280,7 @@ export default function Leads() {
                   : status === 'replied' ? 'No replies yet.' : 'Nothing discarded.'}
               </div></td></tr>
             )}
-            {list && list.leads.map(l => (
+            {!switching && list && list.leads.map(l => (
               <tr key={l.id} tabIndex={0} onClick={() => setOpenId(l.id)} onKeyDown={e => { if (e.key === 'Enter') setOpenId(l.id); }}>
                 {selectable && (
                   <td onClick={e => e.stopPropagation()}>
@@ -311,7 +326,16 @@ export default function Leads() {
       {selectable && selected.length > 0 && (
         <div className="cl-runs" style={{ position: 'sticky', bottom: 12, background: 'var(--bg)', padding: 10, borderRadius: 12, boxShadow: 'var(--shadow-md)', marginTop: 12, alignItems: 'center' }}>
           <b>{selected.length} selected</b>
-          <AddToSequence leadIds={selected} onAdded={(a) => { setSelected(s => s.filter(id => !a.includes(id))); refresh(); }} />
+          {status === 'approved'
+            ? <AddToSequence leadIds={selected} onAdded={(a) => { setSelected(s => s.filter(id => !a.includes(id))); refresh(); }} />
+            : (
+              <button className="btn btn-primary btn-sm" type="button" onClick={async () => {
+                try {
+                  const r = await apiFetch<{ changed: number }>('/api/leads/bulk', jsonBody({ ids: selected, action: 'approve' }));
+                  toast(`${r.changed} approved — add them to a sequence from Approved.`, 'success'); setSelected([]); refresh();
+                } catch (e: any) { toast(e.message, 'error'); }
+              }}><i className="ti ti-check" /> Approve selected</button>
+            )}
           <button className="btn btn-sm" type="button" onClick={() => setSelected([])}>Clear</button>
         </div>
       )}
