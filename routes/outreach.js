@@ -216,13 +216,54 @@ router.get('/due', async (req, res) => {
   }
 });
 
+/**
+ * Your own wording for one lead's next email (subject only for a first email —
+ * a follow-up keeps the thread's "Re:" subject). `reset: true` goes back to the
+ * sequence's text.
+ */
+router.put('/due/:enrollmentId', async (req, res) => {
+  if (!validId(req.params.enrollmentId)) return res.status(404).json({ error: 'Not found' });
+  const b = req.body || {};
+  try {
+    const e = await Enrollment.findOne({ _id: req.params.enrollmentId, userId: req.userId, status: 'active' }, { step: 1 }).lean();
+    if (!e) return res.status(404).json({ error: 'That email is no longer due.' });
+    if (b.reset) {
+      await Enrollment.updateOne({ _id: e._id }, { $set: { edits: null } });
+    } else {
+      const subject = String(b.subject || '').replace(/\s+/g, ' ').trim().slice(0, 160);
+      const body = String(b.body || '').replace(/\r\n?/g, '\n').trim().slice(0, 4000);
+      if (!body) return res.status(400).json({ error: 'The email is empty.' });
+      if (e.step === 0 && !subject) return res.status(400).json({ error: 'The first email needs a subject.' });
+      if (/\{\{|\}\}/.test(`${subject} ${body}`)) return res.status(400).json({ error: 'Replace the {{variables}} with real words — this is the final email.' });
+      await Enrollment.updateOne({ _id: e._id }, { $set: { edits: { step: e.step, subject, body } } });
+    }
+    res.json(await dueSummary(req.userId));
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+/** Take one lead out of its sequence from the due list: nothing more is sent; the lead goes back to Approved. */
+router.post('/due/:enrollmentId/remove', async (req, res) => {
+  if (!validId(req.params.enrollmentId)) return res.status(404).json({ error: 'Not found' });
+  try {
+    const e = await Enrollment.findOne({ _id: req.params.enrollmentId, userId: req.userId }, { leadId: 1 }).lean();
+    if (!e) return res.status(404).json({ error: 'Not found' });
+    await stop(req.userId, [e.leadId], 'manual');
+    res.json(await dueSummary(req.userId));
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 /** One batch, sized to finish inside a request. The page calls again while `more` is true. */
 router.post('/send', async (req, res) => {
+  const only = Array.isArray(req.body && req.body.only) ? req.body.only.filter(validId).slice(0, 200) : null;
   try {
     // Replies first, so nobody who answered gets a follow-up. At most every two minutes,
     // since the page sends batch after batch.
     const mail = await checkMailbox(req.userId, { minIntervalMs: 2 * 60 * 1000, budgetMs: 15_000 }).catch(err => ({ ok: false, error: err.message }));
-    const r = await sendDue(req.userId);
+    const r = await sendDue(req.userId, { only: only && only.length ? only : null });
     res.json({ ...r, mailbox: mail, due: await dueSummary(req.userId) });
   } catch (err) {
     res.status(500).json({ error: err.message });

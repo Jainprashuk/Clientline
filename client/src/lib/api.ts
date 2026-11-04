@@ -216,7 +216,7 @@ export const loadLeadEnrollment = (leadId: string) => apiFetch<{ enrollment: Lea
 export interface DueTask { enrollmentId: string; leadId: string; lead: string; sequence: string; text: string }
 export interface DueEmail {
   enrollmentId: string; leadId: string; name: string; email: string; sequence: string; step: number; steps: number;
-  followUp: boolean; subject: string | null; body: string | null; blocked: string | null;
+  followUp: boolean; subject: string | null; body: string | null; blocked: string | null; edited: boolean;
 }
 export interface DueSummary {
   first: number; followUps: number; items: DueEmail[]; tasks: DueTask[]; inPausedSequences: number;
@@ -224,7 +224,10 @@ export interface DueSummary {
 }
 export interface SendResult { sent: number; skipped: { name: string; reason: string }[]; stoppedBy: string | null; pausedUntil: string | null; more: boolean; due: DueSummary }
 export const loadDue = () => apiFetch<DueSummary>('/api/outreach/due');
-export const sendDueBatch = () => apiFetch<SendResult>('/api/outreach/send', { method: 'POST' });
+export const sendDueBatch = (only?: string[]) => apiFetch<SendResult>('/api/outreach/send', jsonBody({ only: only || null }));
+export const editDueEmail = (enrollmentId: string, patch: { subject?: string; body?: string; reset?: boolean }) =>
+  apiFetch<DueSummary>(`/api/outreach/due/${enrollmentId}`, jsonBody(patch, 'PUT'));
+export const removeDueLead = (enrollmentId: string) => apiFetch<DueSummary>(`/api/outreach/due/${enrollmentId}/remove`, { method: 'POST' });
 export const completeTask = (enrollmentId: string) => apiFetch<{ ok: boolean; due: DueSummary }>(`/api/outreach/tasks/${enrollmentId}/done`, { method: 'POST' });
 
 // ── Inbox ────────────────────────────────────────────────────────────────────

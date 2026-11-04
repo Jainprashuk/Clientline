@@ -37,6 +37,8 @@ const { STARTER } = require('../lib/outreach/render');
 
 const OWNER = process.argv.find(a => a.startsWith('--email='))?.slice(8) || '29jainprashuk@gmail.com';
 const now = new Date();
+// Addresses invented while building the paste source (scripts and early tests).
+const FABRICATED = ['ritika@brewbox.in', 'neha@shopkart.in', 'vikram@ledgerly.io', 'sam@fitloop.in', 'priya@bloomhq.in'];
 
 const TEST_LEADS = [
   {
@@ -80,6 +82,8 @@ async function main() {
   ]);
   await Lead.updateMany({ userId: user._id, _id: { $in: touched }, status: { $in: ['in-sequence', 'replied'] } }, { $set: { status: 'new', sequenceId: null } });
   await Lead.deleteMany({ userId: user._id, name: /^Test · / });
+  // Made-up leads from early testing whose domains might be real companies: never email them.
+  await Lead.deleteMany({ userId: user._id, email: { $in: FABRICATED } });
   await Settings.updateOne({ userId: user._id }, { $set: { gmailEmail: '', gmailAppPasswordEnc: '', sendingPausedUntil: null, 'mailbox.lastCheckAt': null, 'mailbox.scanUntil': null, 'mailbox.lastError': null } });
   console.log(`Cleared: ${e.deletedCount} enrolments, ${s.deletedCount} sent emails, ${c.deletedCount} conversations, ${b.deletedCount} blocklist entries; the placeholder Gmail.`);
 

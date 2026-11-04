@@ -149,3 +149,5 @@
 .cl-skel-row td { padding-top: 10px !important; padding-bottom: 10px !important; }
 @keyframes cl-skel { to { background-position: -200% 0; } }
 @media (prefers-reduced-motion: reduce) { .cl-skel { animation: none; } }
+.cl-due-line { display: flex; gap: 8px; align-items: center; }
+.cl-due-line > input[type=checkbox] { flex-shrink: 0; }

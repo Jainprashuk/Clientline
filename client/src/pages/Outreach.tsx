@@ -4,38 +4,79 @@ import SequenceEditor from '../components/SequenceEditor';
 import { useToast } from '../context/ToastContext';
 import { Link } from 'react-router-dom';
 import {
-  loadSequences, createSequence, updateSequence, loadDue, sendDueBatch, completeTask, loadConnections,
-  type Sequence, type Variable, type DueSummary,
+  loadSequences, createSequence, updateSequence, loadDue, sendDueBatch, completeTask, loadConnections, editDueEmail, removeDueLead,
+  type Sequence, type Variable, type DueSummary, type DueEmail,
 } from '../lib/api';
 
-/** What's due now and the button that sends it, batch after batch, with progress. */
-function DueCard({ due, gmail, onSent, onTaskDone }: {
-  due: DueSummary; gmail: string | null; onSent: (d: DueSummary) => void; onTaskDone: (d: DueSummary) => void;
+/** One due email, opened: edit its wording, go back to the sequence's, or take the lead out. */
+function DueEditor({ item, onSaved }: { item: DueEmail; onSaved: (d: DueSummary) => void }) {
+  const toast = useToast();
+  const [subject, setSubject] = useState(item.subject || '');
+  const [body, setBody] = useState(item.body || '');
+  const [busy, setBusy] = useState<string | null>(null);
+  const dirty = subject !== (item.subject || '') || body !== (item.body || '');
+  const run = async (key: string, fn: () => Promise<DueSummary>, done: string) => {
+    setBusy(key);
+    try { onSaved(await fn()); toast(done, 'success'); } catch (e: any) { toast(e.message, 'error', 7000); } finally { setBusy(null); }
+  };
+  if (item.blocked) return <div className="cl-note" style={{ margin: '0 0 10px' }}>Won’t send: {item.blocked}. Fix the lead (e.g. its first line) or take it out of the sequence.</div>;
+  return (
+    <div className="cl-signal" style={{ margin: '0 0 10px' }}>
+      <div className="src" style={{ marginBottom: 6 }}>To {item.email}{item.edited ? ' · your edited version' : ' · from the sequence'} — a personal unsubscribe line is added when it sends</div>
+      {item.followUp
+        ? <div className="cl-row-sub" style={{ margin: '0 0 6px' }}>Subject: {item.subject} (follow-ups stay in the same thread)</div>
+        : <input type="text" aria-label="Subject" maxLength={160} value={subject} onChange={e => setSubject(e.target.value)} style={{ marginBottom: 8 }} />}
+      <textarea aria-label="Email" rows={9} maxLength={4000} value={body} onChange={e => setBody(e.target.value)} />
+      <div className="cl-meta" style={{ marginTop: 8 }}>
+        <button className="btn btn-primary btn-sm" type="button" disabled={!dirty || busy !== null}
+          onClick={() => run('save', () => editDueEmail(item.enrollmentId, { subject, body }), 'Saved — this version is what goes out.')}>Save</button>
+        {item.edited && <button className="btn btn-sm" type="button" disabled={busy !== null}
+          onClick={() => run('reset', () => editDueEmail(item.enrollmentId, { reset: true }), 'Back to the sequence’s text.')}>Revert to sequence text</button>}
+        <span style={{ flex: 1 }} />
+        <button className="btn btn-danger btn-sm" type="button" disabled={busy !== null}
+          onClick={() => window.confirm(`Take ${item.name} out of “${item.sequence}”? Nothing more is sent to them; the lead goes back to Approved.`)
+            && run('remove', () => removeDueLead(item.enrollmentId), 'Removed from the sequence.')}>Remove from sequence</button>
+      </div>
+    </div>
+  );
+}
+
+/** What's due now: pick which to send (all by default), open one to edit it, then send. */
+function DueCard({ due, gmail, onSent, onChanged }: {
+  due: DueSummary; gmail: string | null; onSent: (d: DueSummary) => void; onChanged: (d: DueSummary) => void;
 }) {
   const toast = useToast();
   const [sending, setSending] = useState<{ sent: number } | null>(null);
   const [report, setReport] = useState<{ sent: number; skipped: { name: string; reason: string }[]; stoppedBy: string | null } | null>(null);
   const [open, setOpen] = useState<string | null>(null);
+  // Unticked rows are left out of this send; everything starts ticked.
+  const [unticked, setUnticked] = useState<string[]>([]);
+  const ids = due.items.map(i => i.enrollmentId);
+  const picked = ids.filter(id => !unticked.includes(id));
   const total = due.first + due.followUps;
+  const all = picked.length === ids.length && total <= ids.length;
+
   const send = async () => {
     setSending({ sent: 0 }); setReport(null);
     let sent = 0; const skipped: { name: string; reason: string }[] = []; let stoppedBy: string | null = null; let last = due;
     try {
       for (let round = 0; round < 20; round++) {
-        const r = await sendDueBatch();
+        const r = await sendDueBatch(all ? undefined : picked);
         sent += r.sent; skipped.push(...r.skipped); last = r.due; stoppedBy = r.stoppedBy;
         setSending({ sent });
         if (!r.more || r.stoppedBy || r.sent === 0) break;
       }
     } catch (e: any) { stoppedBy = e.message; }
-    setSending(null);
+    setSending(null); setUnticked([]);
     setReport({ sent, skipped, stoppedBy });
     onSent(last);
     toast(sent ? `Sent ${sent} email${sent === 1 ? '' : 's'}.` : stoppedBy || 'Nothing could be sent.', sent ? 'success' : 'info', 6000);
   };
   const done = async (id: string) => {
-    try { const r = await completeTask(id); onTaskDone(r.due); } catch (e: any) { toast(e.message, 'error'); }
+    try { const r = await completeTask(id); onChanged(r.due); } catch (e: any) { toast(e.message, 'error'); }
   };
+  const label = all ? 'Send due emails' : `Send selected (${picked.length})`;
+
   return (
     <div className="s-card" style={{ marginBottom: 16 }}>
       <div className="s-head">
@@ -51,36 +92,13 @@ function DueCard({ due, gmail, onSent, onTaskDone }: {
           </div>
         </div>
         {gmail ? (
-          <button className="btn btn-primary" type="button" disabled={!!sending || !total || !!due.pausedUntil} onClick={send}>
-            {sending ? <><i className="ti ti-loader" /> Sending… {sending.sent}</> : <><i className="ti ti-send" /> Send due emails</>}
+          <button className="btn btn-primary" type="button" disabled={!!sending || !total || !picked.length || !!due.pausedUntil} onClick={send}>
+            {sending ? <><i className="ti ti-loader" /> Sending… {sending.sent}</> : <><i className="ti ti-send" /> {label}</>}
           </button>
         ) : <Link className="btn btn-primary" to="/connections">Connect Gmail</Link>}
       </div>
-      {(report || due.pausedUntil || due.tasks.length > 0 || (gmail && total > 0)) && (
+      {(report || due.pausedUntil || due.tasks.length > 0 || due.items.length > 0) && (
         <div className="s-body">
-          {due.items.length > 0 && (
-            <div style={{ marginBottom: 10 }}>
-              {due.items.map(it => (
-                <div key={it.enrollmentId} style={{ borderTop: '1px solid var(--border)' }}>
-                  <button type="button" className="cl-due-row" aria-expanded={open === it.enrollmentId} onClick={() => setOpen(o => (o === it.enrollmentId ? null : it.enrollmentId))}>
-                    <span className="cl-source">{it.followUp ? `Follow-up ${it.step - 1}` : 'First email'}</span>
-                    <span className="who">{it.name}<small>{it.email}</small></span>
-                    <span className="subj">{it.blocked ? <span style={{ color: 'var(--amber)' }}>Won’t send: {it.blocked}</span> : it.subject}</span>
-                    <span className="seq">{it.sequence} · step {it.step} of {it.steps}</span>
-                    <i className={`ti ti-chevron-${open === it.enrollmentId ? 'up' : 'down'}`} />
-                  </button>
-                  {open === it.enrollmentId && it.body && (
-                    <div className="cl-signal" style={{ whiteSpace: 'pre-wrap', fontSize: 13, margin: '0 0 10px' }}>
-                      <div className="src" style={{ marginBottom: 6 }}>To {it.email} · {it.subject}</div>
-                      {it.body}{'\n\n—\nNot for you? Unsubscribe: (a personal link is added when it sends)'}
-                    </div>
-                  )}
-                </div>
-              ))}
-              {total > due.items.length && <div className="cl-hint">…and {total - due.items.length} more.</div>}
-            </div>
-          )}
-          {gmail && total > 0 && !report && <div className="cl-hint" style={{ marginTop: 0 }}>Sends from {gmail}. Replies are checked first, so nobody who answered gets a follow-up.</div>}
           {due.pausedUntil && <div className="cl-note">Gmail’s daily limit was reached. Sending waits until {new Date(due.pausedUntil).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}; nothing is lost.</div>}
           {report && (
             <div className="cl-meta" style={{ marginBottom: 6 }}>
@@ -89,6 +107,32 @@ function DueCard({ due, gmail, onSent, onTaskDone }: {
               {report.stoppedBy && <span style={{ color: 'var(--amber)' }}>· {report.stoppedBy}</span>}
             </div>
           )}
+          {due.items.length > 0 && (
+            <div style={{ marginBottom: 10 }}>
+              <label className="cl-meta" style={{ padding: '4px 2px 8px', cursor: 'pointer' }}>
+                <input type="checkbox" checked={picked.length === ids.length} onChange={e => setUnticked(e.target.checked ? [] : ids)} />
+                {picked.length === ids.length ? 'All selected' : `${picked.length} of ${ids.length} selected`} — open one to edit it before it goes
+              </label>
+              {due.items.map(it => (
+                <div key={it.enrollmentId} style={{ borderTop: '1px solid var(--border)' }}>
+                  <div className="cl-due-line">
+                    <input type="checkbox" aria-label={`Send to ${it.name}`} checked={!unticked.includes(it.enrollmentId)} disabled={!!it.blocked}
+                      onChange={() => setUnticked(u => (u.includes(it.enrollmentId) ? u.filter(x => x !== it.enrollmentId) : [...u, it.enrollmentId]))} />
+                    <button type="button" className="cl-due-row" aria-expanded={open === it.enrollmentId} onClick={() => setOpen(o => (o === it.enrollmentId ? null : it.enrollmentId))}>
+                      <span className="cl-source">{it.followUp ? `Follow-up ${it.step - 1}` : 'First email'}</span>
+                      <span className="who">{it.name}<small>{it.email}</small></span>
+                      <span className="subj">{it.blocked ? <span style={{ color: 'var(--amber)' }}>Won’t send: {it.blocked}</span> : it.subject}{it.edited && <span className="cl-gap" style={{ marginLeft: 8 }}>Edited</span>}</span>
+                      <span className="seq">{it.sequence} · step {it.step} of {it.steps}</span>
+                      <i className={`ti ti-chevron-${open === it.enrollmentId ? 'up' : 'down'}`} />
+                    </button>
+                  </div>
+                  {open === it.enrollmentId && <DueEditor key={`${it.enrollmentId}-${it.edited}-${it.body}`} item={it} onSaved={onChanged} />}
+                </div>
+              ))}
+              {total > due.items.length && <div className="cl-hint">…and {total - due.items.length} more.</div>}
+            </div>
+          )}
+          {gmail && total > 0 && !report && <div className="cl-hint" style={{ marginTop: 0 }}>Sends from {gmail}. Replies are checked first, so nobody who answered gets a follow-up.</div>}
           {due.tasks.length > 0 && (
             <>
               <div className="form-label" style={{ margin: '8px 0 6px' }}>Tasks for you</div>
@@ -185,7 +229,7 @@ export default function Outreach() {
       actions={<button className="btn" type="button" onClick={create}><i className="ti ti-plus" /> New sequence</button>}>
       {error && <div className="info-box danger"><i className="ti ti-alert-triangle" /> {error}</div>}
       {!seqs && !error && <div className="empty-state"><i className="ti ti-loader" />Loading…</div>}
-      {due && <DueCard due={due} gmail={gmail} onSent={d => { setDue(d); load(); }} onTaskDone={setDue} />}
+      {due && <DueCard due={due} gmail={gmail} onSent={d => { setDue(d); load(); }} onChanged={d => { setDue(d); load(); }} />}
       {seqs && seqs.map(s => (
         <SequenceCard key={s.id} seq={s} busy={busy === s.id} onEdit={() => setEditing(s.id)} onToggle={() => toggle(s)} />
       ))}

@@ -26,6 +26,12 @@ const enrollmentSchema = new mongoose.Schema({
   lastMessageId: { type: String, default: null },
   sendingUntil: { type: Date, default: null }, // claim: one sender at a time
   lastError: { type: String, default: null },
+  // Your own wording for the NEXT email to this lead (edited on Outreach before sending).
+  // Only used while `step` still matches; cleared once that email goes.
+  edits: {
+    type: new mongoose.Schema({ step: Number, subject: String, body: String }, { _id: false }),
+    default: null,
+  },
 }, { timestamps: true });
 
 enrollmentSchema.index({ userId: 1, status: 1, nextAt: 1 });
