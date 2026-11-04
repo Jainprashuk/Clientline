@@ -75,3 +75,36 @@
   .lr-filters .cl-toggles { flex: 1 1 100%; flex-wrap: wrap; }
   .lr-filters .cl-toggles .cl-toggle { width: auto !important; flex: 0 0 auto !important; }
 }
+
+/* Pick-or-add combobox (ChipInput). */
+.cl-combo { position: relative; }
+.cl-combo .cl-chips { cursor: text; padding-right: 30px; position: relative; }
+.cl-combo-caret { position: absolute; right: 6px; top: 50%; transform: translateY(-50%); border: 0; background: none; color: var(--text3); cursor: pointer; padding: 4px; }
+.cl-combo-list { position: absolute; z-index: 60; left: 0; right: 0; top: calc(100% + 4px); margin: 0; padding: 4px; list-style: none;
+  background: var(--bg); border: 1px solid var(--border); border-radius: 10px; box-shadow: var(--shadow-md); max-height: 260px; overflow-y: auto; }
+.cl-combo-list li { padding: 7px 10px; border-radius: 7px; font-size: 13px; cursor: pointer; display: flex; gap: 6px; align-items: center; }
+.cl-combo-list li.on { background: var(--accent-bg); color: var(--accent); }
+
+/* Service tiles (setup and My profile). */
+.cl-tiles { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 8px; }
+.cl-tile { display: flex; gap: 10px; align-items: center; text-align: left; padding: 11px 12px; border-radius: 11px; border: 1px solid var(--border);
+  background: var(--bg); color: var(--text); cursor: pointer; font-size: 13.5px; font-weight: 550; font-family: inherit; }
+.cl-tile i { font-size: 19px; color: var(--text3); }
+.cl-tile:hover { border-color: var(--accent); }
+.cl-tile[aria-pressed="true"] { border-color: var(--accent); background: var(--accent-bg); color: var(--accent); }
+.cl-tile[aria-pressed="true"] i { color: var(--accent); }
+.cl-tile .tick { margin-left: auto; opacity: 0; }
+.cl-tile[aria-pressed="true"] .tick { opacity: 1; }
+.cl-tile-add { display: flex; gap: 8px; margin-top: 10px; }
+.cl-tile-add input { flex: 1; }
+
+/* Setup steps. */
+.cl-setup { max-width: 760px; margin: 0 auto; }
+.cl-steps { display: flex; gap: 6px; margin-bottom: 18px; }
+.cl-steps span { flex: 1; height: 4px; border-radius: 99px; background: var(--border); }
+.cl-steps span.on { background: var(--accent); }
+.cl-setup h2 { font-size: 20px; font-weight: 650; margin: 0 0 4px; letter-spacing: -.01em; }
+.cl-setup .lead { color: var(--text2); font-size: 13.5px; margin: 0 0 16px; }
+.cl-setup-foot { display: flex; gap: 10px; justify-content: space-between; align-items: center; margin-top: 20px; }
+.cl-range { width: 100%; accent-color: var(--accent); }
+.cl-amount { font-size: 26px; font-weight: 700; font-variant-numeric: tabular-nums; }

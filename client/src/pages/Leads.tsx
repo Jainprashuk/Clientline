@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import Layout from '../components/Layout';
 import HoverCard from '../components/HoverCard';
 import LeadDrawer from '../components/LeadDrawer';
@@ -29,6 +29,7 @@ function runSummary(r: SourceRun) {
 
 function FindLeads({ sources, busy, onRun }: { sources: SourcesView | null; busy: RunnableSource | null; onRun: (s: RunnableSource) => void }) {
   const [open, setOpen] = useState(false);
+  const navigate = useNavigate();
   const wrap = useRef<HTMLDivElement>(null);
   useEffect(() => {
     if (!open) return;
@@ -48,8 +49,14 @@ function FindLeads({ sources, busy, onRun }: { sources: SourcesView | null; busy
             const st = sources?.sources.find(s => s.source === r.source);
             const last = st?.lastRun;
             return (
-              <button key={r.source} type="button" role="menuitem" disabled={!!st?.needs}
-                onClick={() => { setOpen(false); onRun(r.source); }}>
+              <button key={r.source} type="button" role="menuitem"
+                onClick={() => {
+                  setOpen(false);
+                  // Not ready yet: take them to what fixes it rather than a dead button.
+                  if (st?.needs && sources && !sources.profileComplete) navigate('/setup');
+                  else if (st?.needs) navigate('/connections');
+                  else onRun(r.source);
+                }}>
                 <i className={`ti ${r.icon}`} style={{ fontSize: 17, marginTop: 1 }} />
                 <span>
                   {st?.label || SOURCE_LABEL[r.source]}
@@ -67,6 +74,7 @@ function FindLeads({ sources, busy, onRun }: { sources: SourcesView | null; busy
 
 export default function Leads() {
   const toast = useToast();
+  const [params, setParams] = useSearchParams();
   const [status, setStatus] = useState<LeadStatus>('new');
   const [source, setSource] = useState<LeadSource | ''>('');
   const [q, setQ] = useState('');
@@ -117,6 +125,21 @@ export default function Leads() {
     else setList(prev => prev && { ...prev, leads: prev.leads.map(x => (x.id === l.id ? { ...x, ...l } : x)) });
   };
 
+  // Straight after setup: run the keyless sources once so the first visit has leads.
+  const firstRun = useRef(false);
+  useEffect(() => {
+    if (params.get('first') !== '1' || firstRun.current || !sources || !sources.profileComplete) return;
+    firstRun.current = true;
+    setParams({}, { replace: true });
+    (async () => {
+      for (const s of ['hn', 'news', 'web-post'] as RunnableSource[]) {
+        const st = sources.sources.find(x => x.source === s);
+        if (st && !st.needs) await run(s);
+      }
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [params, sources]);
+
   const profileMissing = sources && !sources.profileComplete;
   const counts = list?.counts;
 
@@ -129,9 +152,17 @@ export default function Leads() {
         </div>
       }>
       {profileMissing && (
-        <div className="info-box" style={{ marginBottom: 14 }}>
-          <i className="ti ti-info-circle" style={{ fontSize: 15, flexShrink: 0 }} />
-          <div>Leads are judged against your profile. Add {sources!.missing.join(', ')} in <Link to="/profile">My profile</Link> to start.</div>
+        <div className="s-card" style={{ marginBottom: 16 }}>
+          <div className="s-head">
+            <div className="s-head-left">
+              <div className="s-icon"><i className="ti ti-rocket" /></div>
+              <div>
+                <div className="s-title">Tell us what you do — 30 seconds</div>
+                <div className="s-sub">Three quick picks (your services, smallest project, where clients can be) and your first leads arrive.</div>
+              </div>
+            </div>
+            <Link className="btn btn-primary" to="/setup">Set up <i className="ti ti-arrow-right" /></Link>
+          </div>
         </div>
       )}
 

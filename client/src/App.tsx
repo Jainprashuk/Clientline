@@ -6,6 +6,7 @@ import ComingSoon from './pages/ComingSoon';
 import Connections from './pages/Connections';
 import Profile from './pages/Profile';
 import Leads from './pages/Leads';
+import Setup from './pages/Setup';
 
 // Built sections; every other one is still a ComingSoon placeholder.
 const PAGES: Record<string, () => JSX.Element> = {
@@ -40,6 +41,8 @@ export default function App() {
       {SECTIONS.map(s => (
         <Route key={s.path} path={s.path} element={<SignedIn>{(() => { const Page = PAGES[s.path]; return Page ? <Page /> : <ComingSoon section={s} />; })()}</SignedIn>} />
       ))}
+      {/* Not in the sidebar: reached from Leads while the profile is empty. */}
+      <Route path="/setup" element={<SignedIn><Setup /></SignedIn>} />
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   );

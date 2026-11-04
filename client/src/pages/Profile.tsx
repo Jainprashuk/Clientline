@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import Layout from '../components/Layout';
 import ChipInput from '../components/ChipInput';
+import ServicePicker from '../components/ServicePicker';
+import { LOCATION_OPTIONS, EXCLUSION_OPTIONS, suggestKeywords } from '../lib/presets';
 import { useToast } from '../context/ToastContext';
 import { loadProfile, saveProfile, type Profile as ProfileData, type ProfileView } from '../lib/api';
 
@@ -9,31 +11,6 @@ const CLIENT_TYPES: [string, string][] = [
   ['agencies', 'Agencies'], ['nonprofit', 'Nonprofits'], ['enterprise', 'Large companies'],
 ];
 const SIZES: [string, string][] = [['1-10', '1–10 people'], ['11-50', '11–50'], ['51-200', '51–200'], ['200+', '200+']];
-const LOCATION_PRESETS = ['india', 'us', 'uk', 'europe', 'canada', 'australia', 'uae', 'singapore'];
-const EXCLUSION_PRESETS = ['equity only', 'unpaid', 'revenue share', 'internship', 'full-time', 'wordpress'];
-
-// Words that, in a service name, suggest the keywords a client's post would use.
-// Only a starting point: the user edits the chips.
-const KEYWORD_HINTS: Record<string, string[]> = {
-  react: ['react', 'next.js', 'frontend'], next: ['next.js', 'react'], node: ['node.js', 'backend', 'api'],
-  web: ['website', 'web app', 'web developer'], website: ['website', 'landing page', 'web developer'],
-  landing: ['landing page', 'website'], mobile: ['mobile app', 'react native', 'flutter'], app: ['app developer', 'mvp'],
-  flutter: ['flutter', 'mobile app'], android: ['android', 'mobile app'], ios: ['ios', 'swift', 'mobile app'],
-  shopify: ['shopify', 'e-commerce', 'store'], wordpress: ['wordpress', 'website'], design: ['designer', 'ui/ux', 'figma'],
-  ui: ['ui/ux', 'figma', 'designer'], ux: ['ui/ux', 'figma'], brand: ['branding', 'logo', 'brand designer'],
-  logo: ['logo', 'branding'], seo: ['seo', 'search ranking'], marketing: ['marketing', 'growth'], content: ['content writer', 'copywriting'],
-  copy: ['copywriter', 'copywriting'], video: ['video editor', 'video editing'], data: ['data analyst', 'dashboard', 'python'],
-  python: ['python', 'django', 'automation'], ai: ['ai', 'llm', 'chatbot'], automation: ['automation', 'zapier', 'workflow'],
-  devops: ['devops', 'aws', 'deployment'], backend: ['backend', 'api', 'database'], dashboard: ['dashboard', 'admin panel'],
-  mvp: ['mvp', 'prototype'],
-};
-function suggestKeywords(name: string): string[] {
-  const out: string[] = [];
-  for (const w of name.toLowerCase().split(/[^a-z0-9+.#]+/)) {
-    for (const k of KEYWORD_HINTS[w.replace(/\.js$/, '')] || []) if (!out.includes(k)) out.push(k);
-  }
-  return out;
-}
 
 const EMPTY: ProfileData = {
   name: '', headline: '', services: [], currency: 'INR', rate: 0, minProject: 0, clientTypes: [], companySizes: [],
@@ -137,7 +114,9 @@ export default function Profile() {
             </div>
           </Card>
 
-          <Card icon="ti-briefcase" title="What you sell" sub="A lead only counts if their post mentions one of a service’s keywords">
+          <Card icon="ti-briefcase" title="What you sell" sub="Pick what you do, or add your own. A lead only counts if their post mentions one of a service’s keywords">
+            <ServicePicker value={p.services} onChange={v => set('services', v)} />
+            {p.services.length > 0 && <div className="form-label" style={{ margin: '18px 0 8px' }}>Fine-tune each service</div>}
             {p.services.map((s, i) => (
               <div className="cl-row" key={i}>
                 <button type="button" className="btn btn-xs cl-row-remove" aria-label={`Remove ${s.name || 'service'}`}
@@ -162,11 +141,6 @@ export default function Profile() {
                 </div>
               </div>
             ))}
-            {p.services.length < 10 && (
-              <button type="button" className="btn" onClick={() => set('services', [...p.services, { name: '', keywords: [], minBudget: 0 }])}>
-                <i className="ti ti-plus" /> Add a service
-              </button>
-            )}
           </Card>
 
           <Card icon="ti-currency-rupee" title="Pricing" sub="Leads with a stated budget below your minimum are dropped">
@@ -200,7 +174,7 @@ export default function Profile() {
             <div className="form-group">
               <label className="form-label">Where they can be</label>
               <ChipInput label="Client locations" value={p.locations} max={10} placeholder="A country or city"
-                suggestions={LOCATION_PRESETS} onChange={v => set('locations', v)} />
+                suggestions={LOCATION_OPTIONS} onChange={v => set('locations', v)} />
               <label style={{ display: 'flex', gap: 8, alignItems: 'center', marginTop: 10, fontSize: 13 }}>
                 <input type="checkbox" checked={p.remoteOk} onChange={e => set('remoteOk', e.target.checked)} />
                 Remote clients anywhere are fine
@@ -210,7 +184,7 @@ export default function Profile() {
 
           <Card icon="ti-ban" title="Leave out" sub="A post mentioning any of these is dropped">
             <ChipInput label="Words that rule a lead out" value={p.exclusions} max={30} placeholder="A word or phrase"
-              suggestions={EXCLUSION_PRESETS} onChange={v => set('exclusions', v)} />
+              suggestions={EXCLUSION_OPTIONS} onChange={v => set('exclusions', v)} />
           </Card>
 
           <Card icon="ti-award" title="Proof" sub="The only results and quotes a first line may mention">
