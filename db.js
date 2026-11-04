@@ -7,7 +7,8 @@ require('./lib/authDb');
  * own; the account store is reached through lib/authDb.js on the same pool.
  */
 async function connect() {
-  const env = process.env.NODE_ENV === 'prod' ? 'prod' : 'dev';
+  // Same rule as lib/authDb.js: Vercel's default 'production' counts as prod.
+  const env = ['prod', 'production'].includes(process.env.NODE_ENV) ? 'prod' : 'dev';
   const uri = env === 'prod' ? process.env.MONGODB_URI_PROD : process.env.MONGODB_URI_DEV;
   if (!uri) throw new Error(`MONGODB_URI_${env.toUpperCase()} is not set`);
 
