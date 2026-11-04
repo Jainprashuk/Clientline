@@ -15,6 +15,7 @@ function DueCard({ due, gmail, onSent, onTaskDone }: {
   const toast = useToast();
   const [sending, setSending] = useState<{ sent: number } | null>(null);
   const [report, setReport] = useState<{ sent: number; skipped: { name: string; reason: string }[]; stoppedBy: string | null } | null>(null);
+  const [open, setOpen] = useState<string | null>(null);
   const total = due.first + due.followUps;
   const send = async () => {
     setSending({ sent: 0 }); setReport(null);
@@ -57,6 +58,28 @@ function DueCard({ due, gmail, onSent, onTaskDone }: {
       </div>
       {(report || due.pausedUntil || due.tasks.length > 0 || (gmail && total > 0)) && (
         <div className="s-body">
+          {due.items.length > 0 && (
+            <div style={{ marginBottom: 10 }}>
+              {due.items.map(it => (
+                <div key={it.enrollmentId} style={{ borderTop: '1px solid var(--border)' }}>
+                  <button type="button" className="cl-due-row" aria-expanded={open === it.enrollmentId} onClick={() => setOpen(o => (o === it.enrollmentId ? null : it.enrollmentId))}>
+                    <span className="cl-source">{it.followUp ? `Follow-up ${it.step - 1}` : 'First email'}</span>
+                    <span className="who">{it.name}<small>{it.email}</small></span>
+                    <span className="subj">{it.blocked ? <span style={{ color: 'var(--amber)' }}>Won’t send: {it.blocked}</span> : it.subject}</span>
+                    <span className="seq">{it.sequence} · step {it.step} of {it.steps}</span>
+                    <i className={`ti ti-chevron-${open === it.enrollmentId ? 'up' : 'down'}`} />
+                  </button>
+                  {open === it.enrollmentId && it.body && (
+                    <div className="cl-signal" style={{ whiteSpace: 'pre-wrap', fontSize: 13, margin: '0 0 10px' }}>
+                      <div className="src" style={{ marginBottom: 6 }}>To {it.email} · {it.subject}</div>
+                      {it.body}{'\n\n—\nNot for you? Unsubscribe: (a personal link is added when it sends)'}
+                    </div>
+                  )}
+                </div>
+              ))}
+              {total > due.items.length && <div className="cl-hint">…and {total - due.items.length} more.</div>}
+            </div>
+          )}
           {gmail && total > 0 && !report && <div className="cl-hint" style={{ marginTop: 0 }}>Sends from {gmail}. Replies are checked first, so nobody who answered gets a follow-up.</div>}
           {due.pausedUntil && <div className="cl-note">Gmail’s daily limit was reached. Sending waits until {new Date(due.pausedUntil).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}; nothing is lost.</div>}
           {report && (

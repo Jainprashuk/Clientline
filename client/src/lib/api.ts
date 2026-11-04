@@ -214,8 +214,12 @@ export const loadLeadEnrollment = (leadId: string) => apiFetch<{ enrollment: Lea
 
 // ── Outreach: sending ────────────────────────────────────────────────────────
 export interface DueTask { enrollmentId: string; leadId: string; lead: string; sequence: string; text: string }
+export interface DueEmail {
+  enrollmentId: string; leadId: string; name: string; email: string; sequence: string; step: number; steps: number;
+  followUp: boolean; subject: string | null; body: string | null; blocked: string | null;
+}
 export interface DueSummary {
-  first: number; followUps: number; tasks: DueTask[]; inPausedSequences: number;
+  first: number; followUps: number; items: DueEmail[]; tasks: DueTask[]; inPausedSequences: number;
   sentToday: number; sendsPerDay: number; roomToday: number; pausedUntil: string | null;
 }
 export interface SendResult { sent: number; skipped: { name: string; reason: string }[]; stoppedBy: string | null; pausedUntil: string | null; more: boolean; due: DueSummary }
