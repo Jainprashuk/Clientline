@@ -8,7 +8,8 @@ const authRoutes = require('./routes/auth');
 
 const app = express();
 app.set('trust proxy', true);
-app.use(compression());
+// Inngest's responses are signed; compressing them breaks the check.
+app.use(compression({ filter: (req, res) => !req.path.startsWith('/api/inngest') && compression.filter(req, res) }));
 app.use(express.json({ limit: '1mb' }));
 
 // ── Database ────────────────────────────────────────────────────────────────
@@ -68,6 +69,14 @@ app.use('/api/auth', async (_req, res, next) => {
 app.use('/u', async (_req, res, next) => {
   try { await ensureDb(); next(); } catch (err) { res.status(503).send('Please try again in a minute.'); }
 }, express.urlencoded({ extended: false }), require('./routes/unsubscribe'));
+// Background work (lib/outreach/inngest.js). Inngest signs its calls with
+// INNGEST_SIGNING_KEY; the SDK checks that, so it sits ahead of requireAuth.
+{
+  const { serve } = require('inngest/express');
+  const { inngest } = require('./inngest');
+  const { outreachSendRun, outreachMailboxHourly, outreachMailboxCheck } = require('./lib/outreach/inngest');
+  app.use('/api/inngest', serve({ client: inngest, functions: [outreachSendRun, outreachMailboxHourly, outreachMailboxCheck] }));
+}
 app.use(requireAuth);
 app.use('/api/auth', authRoutes);
 app.use('/api/connections', require('./routes/connections'));

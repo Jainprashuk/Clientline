@@ -13,8 +13,8 @@ const Profile = require('../models/Profile');
 const Settings = require('../models/Settings');
 const { renderStep, whyBlocked, variablesIn, VARIABLES, STARTER } = require('../lib/outreach/render');
 const { enroll, stop, forLead } = require('../lib/outreach/enroll');
-const { sendDue, dueSummary, completeTask } = require('../lib/outreach/send');
-const { checkMailbox } = require('../lib/mailbox/scan');
+const { startSendRun, stopRun, runForPanel } = require('../lib/outreach/runs');
+const { dueSummary, completeTask } = require('../lib/outreach/send');
 
 const router = express.Router();
 const validId = (id) => mongoose.isValidObjectId(id);
@@ -257,18 +257,46 @@ router.post('/due/:enrollmentId/remove', async (req, res) => {
 });
 
 /** One batch, sized to finish inside a request. The page calls again while `more` is true. */
+// Starts sending in the background (lib/outreach/runs.js); the floating panel
+// follows it through GET /runs/active.
 router.post('/send', async (req, res) => {
   const only = Array.isArray(req.body && req.body.only) ? req.body.only.filter(validId).slice(0, 200) : null;
   try {
-    // Replies first, so nobody who answered gets a follow-up. At most every two minutes,
-    // since the page sends batch after batch.
-    const mail = await checkMailbox(req.userId, { minIntervalMs: 2 * 60 * 1000, budgetMs: 15_000 }).catch(err => ({ ok: false, error: err.message }));
-    const r = await sendDue(req.userId, { only: only && only.length ? only : null });
-    res.json({ ...r, mailbox: mail, due: await dueSummary(req.userId) });
+    const r = await startSendRun(req.userId, { only: only && only.length ? only : null });
+    if (r.busy) return res.status(409).json({ error: 'Already sending — see the panel at the bottom right.', run: runView(r.busy) });
+    if (r.nothing) return res.status(400).json({ error: 'Nothing is due right now.' });
+    res.json({ run: runView(r.run) });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
 });
+
+router.get('/runs/active', async (req, res) => {
+  try {
+    const r = await runForPanel(req.userId);
+    res.json({ run: r ? runView(r) : null });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+router.post('/runs/:id/stop', async (req, res) => {
+  if (!validId(req.params.id)) return res.status(404).json({ error: 'No such run' });
+  try {
+    const ok = await stopRun(req.userId, req.params.id);
+    res.json({ ok });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+function runView(r) {
+  return {
+    id: String(r._id), status: r.status, trigger: r.trigger, total: r.total, sent: r.sent,
+    skipped: r.skipped || [], last: r.last && r.last.email ? r.last : null, stoppedBy: r.stoppedBy,
+    stopRequested: !!r.stopRequested, startedAt: r.startedAt, finishedAt: r.finishedAt,
+  };
+}
 
 router.post('/tasks/:enrollmentId/done', async (req, res) => {
   if (!validId(req.params.enrollmentId)) return res.status(404).json({ error: 'No such task' });

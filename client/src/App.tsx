@@ -9,6 +9,7 @@ import Leads from './pages/Leads';
 import Setup from './pages/Setup';
 import Outreach from './pages/Outreach';
 import Inbox from './pages/Inbox';
+import SendWidget from './components/SendWidget';
 
 // Built sections; every other one is still a ComingSoon placeholder.
 const PAGES: Record<string, () => JSX.Element> = {
@@ -29,7 +30,7 @@ function SignedIn({ children }: { children: ReactNode }) {
 }
 
 export default function App() {
-  const { loading } = useSession();
+  const { loading, signedIn } = useSession();
 
   if (loading) {
     return (
@@ -41,6 +42,7 @@ export default function App() {
   }
 
   return (
+    <>
     <Routes>
       {SECTIONS.map(s => (
         <Route key={s.path} path={s.path} element={<SignedIn>{(() => { const Page = PAGES[s.path]; return Page ? <Page /> : <ComingSoon section={s} />; })()}</SignedIn>} />
@@ -49,5 +51,7 @@ export default function App() {
       <Route path="/setup" element={<SignedIn><Setup /></SignedIn>} />
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
+    {signedIn && <SendWidget />}
+    </>
   );
 }

@@ -4,12 +4,12 @@ Things decided or noticed but parked. Add to it as you go; move an item out when
 
 ## Next up
 
-- **Automatic sending and reply checks (Inngest)** — today you press "Send due emails" and the Inbox checks Gmail when opened. An hourly job per user would send what's due (`lib/outreach/send.js` `sendDue`) and check replies (`lib/mailbox/scan.js` `checkMailbox`) on its own; the same setup as daily lead runs below.
+- **Automatic follow-up sending** — "Send due emails" now runs in the background through Inngest (`lib/outreach/runs.js`, `lib/outreach/inngest.js`) and replies are checked hourly, but sending still starts only when you press the button. An hourly cron could call `startSendRun(userId, { trigger: 'auto' })` for users who turn it on (a setting; the panel already labels auto runs). Needs send windows first, so nothing goes out at 3 a.m.
 - **A real Gmail round trip** — Outreach was tested in dry-run (`MAIL_DRY_RUN=1`) and with simulated replies. Still to do once, with your OK: send step 1 to an address you choose, reply, Check for replies, answer from Inbox, click unsubscribe.
 - **Daily automatic runs (Inngest)** — slice 6 of the Leads plan.
   - One Inngest function per source, triggered by an event, `concurrency { limit: 1, key: userId }`, one step per unit (thread / search) so no step nears Vercel's 60 s.
   - Daily crons fan out to users whose profile is complete and who have the source on: news and client posts 08:00 IST, HN on days 1–10 at 07:00 IST. First lines written as a last step.
-  - `app.js`: serve `/api/inngest` (skip login and compression for it, like Outreach `server.js:196`). `POST /api/sources/run` sends an event when Inngest is configured; runs inline as now when it isn't (local).
+  - `app.js` already serves `/api/inngest` (outreach functions); add the source functions to that `serve` list. `POST /api/sources/run` sends an event when Inngest is configured; runs inline as now when it isn't (local).
   - Env on Vercel: `INNGEST_EVENT_KEY`, `INNGEST_SIGNING_KEY`, `INNGEST_APP_ID=clientline`. Re-sync the app in Inngest after deploy.
   - Building blocks already exist: `lib/sources/run.js` (`startRun`, `planRun`, `runUnit`, `finishRun`), `lib/leads/opener.js` (`writeOpenersFor`), root `inngest.js`.
 - **Admin app** — one app to manage users and access requests for both Outreach and Clientline (global `isAdmin`). Until then: `scripts/grant-access.js`.

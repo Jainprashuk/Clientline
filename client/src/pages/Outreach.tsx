@@ -1,10 +1,10 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import Layout from '../components/Layout';
 import SequenceEditor from '../components/SequenceEditor';
 import { useToast } from '../context/ToastContext';
 import { Link } from 'react-router-dom';
 import {
-  loadSequences, createSequence, updateSequence, loadDue, sendDueBatch, completeTask, loadConnections, editDueEmail, removeDueLead,
+  loadSequences, createSequence, updateSequence, loadDue, startSending, activeSendRun, SEND_STARTED_EVENT, SEND_FINISHED_EVENT, completeTask, loadConnections, editDueEmail, removeDueLead,
   type Sequence, type Variable, type DueSummary, type DueEmail,
 } from '../lib/api';
 
@@ -46,8 +46,8 @@ function DueCard({ due, gmail, onSent, onChanged }: {
   due: DueSummary; gmail: string | null; onSent: (d: DueSummary) => void; onChanged: (d: DueSummary) => void;
 }) {
   const toast = useToast();
-  const [sending, setSending] = useState<{ sent: number } | null>(null);
-  const [report, setReport] = useState<{ sent: number; skipped: { name: string; reason: string }[]; stoppedBy: string | null } | null>(null);
+  // A send in the background (lib/outreach/runs.js); the floating panel shows its progress.
+  const [sending, setSending] = useState(false);
   const [open, setOpen] = useState<string | null>(null);
   // Unticked rows are left out of this send; everything starts ticked.
   const [unticked, setUnticked] = useState<string[]>([]);
@@ -56,21 +56,29 @@ function DueCard({ due, gmail, onSent, onChanged }: {
   const total = due.first + due.followUps;
   const all = picked.length === ids.length && total <= ids.length;
 
+  const onSentRef = useRef(onSent);
+  onSentRef.current = onSent;
+  useEffect(() => {
+    activeSendRun().then(r => setSending(!!r.run && ['queued', 'running'].includes(r.run.status))).catch(() => {});
+    const started = () => setSending(true);
+    const finished = () => { setSending(false); loadDue().then(d => onSentRef.current(d)).catch(() => {}); };
+    window.addEventListener(SEND_STARTED_EVENT, started);
+    window.addEventListener(SEND_FINISHED_EVENT, finished);
+    return () => { window.removeEventListener(SEND_STARTED_EVENT, started); window.removeEventListener(SEND_FINISHED_EVENT, finished); };
+  }, []);
+
   const send = async () => {
-    setSending({ sent: 0 }); setReport(null);
-    let sent = 0; const skipped: { name: string; reason: string }[] = []; let stoppedBy: string | null = null; let last = due;
+    setSending(true);
     try {
-      for (let round = 0; round < 20; round++) {
-        const r = await sendDueBatch(all ? undefined : picked);
-        sent += r.sent; skipped.push(...r.skipped); last = r.due; stoppedBy = r.stoppedBy;
-        setSending({ sent });
-        if (!r.more || r.stoppedBy || r.sent === 0) break;
-      }
-    } catch (e: any) { stoppedBy = e.message; }
-    setSending(null); setUnticked([]);
-    setReport({ sent, skipped, stoppedBy });
-    onSent(last);
-    toast(sent ? `Sent ${sent} email${sent === 1 ? '' : 's'}.` : stoppedBy || 'Nothing could be sent.', sent ? 'success' : 'info', 6000);
+      const r = await startSending(all ? undefined : picked);
+      setUnticked([]);
+      window.dispatchEvent(new CustomEvent(SEND_STARTED_EVENT, { detail: r.run }));
+      toast('Sending in the background — you can leave this page.', 'success', 5000);
+    } catch (e: any) {
+      setSending(false);
+      toast(e.message, 'error', 6000);
+      if (/Already sending/.test(e.message)) { setSending(true); window.dispatchEvent(new Event(SEND_STARTED_EVENT)); }
+    }
   };
   const done = async (id: string) => {
     try { const r = await completeTask(id); onChanged(r.due); } catch (e: any) { toast(e.message, 'error'); }
@@ -93,20 +101,13 @@ function DueCard({ due, gmail, onSent, onChanged }: {
         </div>
         {gmail ? (
           <button className="btn btn-primary" type="button" disabled={!!sending || !total || !picked.length || !!due.pausedUntil} onClick={send}>
-            {sending ? <><i className="ti ti-loader" /> Sending… {sending.sent}</> : <><i className="ti ti-send" /> {label}</>}
+            {sending ? <><i className="ti ti-loader" /> Sending…</> : <><i className="ti ti-send" /> {label}</>}
           </button>
         ) : <Link className="btn btn-primary" to="/connections">Connect Gmail</Link>}
       </div>
-      {(report || due.pausedUntil || due.tasks.length > 0 || due.items.length > 0) && (
+      {(due.pausedUntil || due.tasks.length > 0 || due.items.length > 0) && (
         <div className="s-body">
           {due.pausedUntil && <div className="cl-note">Gmail’s daily limit was reached. Sending waits until {new Date(due.pausedUntil).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}; nothing is lost.</div>}
-          {report && (
-            <div className="cl-meta" style={{ marginBottom: 6 }}>
-              <b>Sent {report.sent}</b>
-              {report.skipped.length > 0 && <span>· Not sent: {report.skipped.slice(0, 4).map(s => `${s.name} (${s.reason})`).join(', ')}{report.skipped.length > 4 ? '…' : ''}</span>}
-              {report.stoppedBy && <span style={{ color: 'var(--amber)' }}>· {report.stoppedBy}</span>}
-            </div>
-          )}
           {due.items.length > 0 && (
             <div style={{ marginBottom: 10 }}>
               <label className="cl-meta" style={{ padding: '4px 2px 8px', cursor: 'pointer' }}>
@@ -132,7 +133,7 @@ function DueCard({ due, gmail, onSent, onChanged }: {
               {total > due.items.length && <div className="cl-hint">…and {total - due.items.length} more.</div>}
             </div>
           )}
-          {gmail && total > 0 && !report && <div className="cl-hint" style={{ marginTop: 0 }}>Sends from {gmail}. Replies are checked first, so nobody who answered gets a follow-up.</div>}
+          {gmail && total > 0 && <div className="cl-hint" style={{ marginTop: 0 }}>Sends from {gmail}. Replies are checked first, so nobody who answered gets a follow-up. Sending carries on in the background — the panel at the bottom right shows how far it got.</div>}
           {due.tasks.length > 0 && (
             <>
               <div className="form-label" style={{ margin: '8px 0 6px' }}>Tasks for you</div>

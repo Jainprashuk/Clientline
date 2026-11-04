@@ -8,6 +8,6 @@ const { Inngest } = require('inngest');
 // run on Vercel did its work and then crashed (FUNCTION_INVOCATION_FAILED) while
 // checkpointing, so Inngest retried each one twice. Classic mode is what ran
 // cleanly before that sync.
-const inngest = new Inngest({ id: process.env.INNGEST_APP_ID || 'outreach-app', checkpointing: false });
+const inngest = new Inngest({ id: process.env.INNGEST_APP_ID || 'clientline', checkpointing: false });
 
 module.exports = { inngest };

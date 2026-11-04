@@ -222,9 +222,18 @@ export interface DueSummary {
   first: number; followUps: number; items: DueEmail[]; tasks: DueTask[]; inPausedSequences: number;
   sentToday: number; sendsPerDay: number; roomToday: number; pausedUntil: string | null;
 }
-export interface SendResult { sent: number; skipped: { name: string; reason: string }[]; stoppedBy: string | null; pausedUntil: string | null; more: boolean; due: DueSummary }
+export interface SendRun {
+  id: string; status: 'queued' | 'running' | 'done' | 'stopped' | 'failed'; trigger: 'manual' | 'auto';
+  total: number; sent: number; skipped: { name: string; reason: string }[]; last: { name: string; email: string } | null;
+  stoppedBy: string | null; stopRequested: boolean; startedAt: string; finishedAt: string | null;
+}
+/** Fired on window when a send run starts here (the panel shows it at once) and when one ends (the Outreach page refreshes). */
+export const SEND_STARTED_EVENT = 'clientline:send-started';
+export const SEND_FINISHED_EVENT = 'clientline:send-finished';
 export const loadDue = () => apiFetch<DueSummary>('/api/outreach/due');
-export const sendDueBatch = (only?: string[]) => apiFetch<SendResult>('/api/outreach/send', jsonBody({ only: only || null }));
+export const startSending = (only?: string[]) => apiFetch<{ run: SendRun }>('/api/outreach/send', jsonBody({ only: only || null }));
+export const activeSendRun = () => apiFetch<{ run: SendRun | null }>('/api/outreach/runs/active');
+export const stopSendRun = (id: string) => apiFetch<{ ok: boolean }>(`/api/outreach/runs/${id}/stop`, { method: 'POST' });
 export const editDueEmail = (enrollmentId: string, patch: { subject?: string; body?: string; reset?: boolean }) =>
   apiFetch<DueSummary>(`/api/outreach/due/${enrollmentId}`, jsonBody(patch, 'PUT'));
 export const removeDueLead = (enrollmentId: string) => apiFetch<DueSummary>(`/api/outreach/due/${enrollmentId}/remove`, { method: 'POST' });
