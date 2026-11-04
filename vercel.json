@@ -6,7 +6,7 @@
       "src": "server.js",
       "use": "@vercel/node",
       "config": {
-        "includeFiles": ["login.html", "css/**", "client/dist/**"],
+        "includeFiles": ["app.js", "login.html", "css/**", "client/dist/**"],
         "maxDuration": 60
       }
     }

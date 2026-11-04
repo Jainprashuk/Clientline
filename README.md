@@ -31,7 +31,7 @@ pool); everything else lives in Clientline's own database.
 ## Run locally
 
 ```sh
-cp .env.example .env        # fill in; AUTH_DB_DEV=outreach_dev
+cp .env.example .env        # fill in; AUTH_DB=outreach_dev
 npm install
 npm run build:client        # or: npm run dev:client (Vite on :5174, proxies to :3001)
 npm run dev                 # http://localhost:3001
@@ -43,5 +43,7 @@ emailed.
 ## Deploy
 
 Vercel, like Outreach: `client/dist` is committed and served by `server.js`.
-Set `NODE_ENV=prod`, `MONGODB_URI_PROD`, `AUTH_DB_PROD=outreach_prod`,
-`RESEND_API_KEY`, `OTP_FROM_EMAIL` and `CLIENTLINE_URL`.
+Root Directory is the repo root, framework preset Other. Set `NODE_ENV=prod`,
+`MONGODB_URI` (database `clientline_prod`), `AUTH_DB=outreach_prod`,
+`RESEND_API_KEY`, `OTP_FROM_EMAIL` and `CLIENTLINE_URL`. A missing one is named
+on every page instead of crashing the function.

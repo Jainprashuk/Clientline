@@ -1,4 +1,5 @@
 const mongoose = require('mongoose');
+const { prod, mongoUri } = require('./lib/config');
 // Registers the shared account store on this connection (lib/authDb.js).
 require('./lib/authDb');
 
@@ -7,15 +8,13 @@ require('./lib/authDb');
  * own; the account store is reached through lib/authDb.js on the same pool.
  */
 async function connect() {
-  // Same rule as lib/authDb.js: Vercel's default 'production' counts as prod.
-  const env = ['prod', 'production'].includes(process.env.NODE_ENV) ? 'prod' : 'dev';
-  const uri = env === 'prod' ? process.env.MONGODB_URI_PROD : process.env.MONGODB_URI_DEV;
-  if (!uri) throw new Error(`MONGODB_URI_${env.toUpperCase()} is not set`);
+  const env = prod ? 'prod' : 'dev';
+  if (!mongoUri) throw new Error('MONGODB_URI is not set');
 
   // Fail fast instead of queuing operations while the database is unreachable.
   mongoose.set('bufferCommands', false);
 
-  await mongoose.connect(uri, {
+  await mongoose.connect(mongoUri, {
     maxPoolSize: 5,              // small pool for serverless: each instance has its own
     serverSelectionTimeoutMS: 5000,
     socketTimeoutMS: 45000,
