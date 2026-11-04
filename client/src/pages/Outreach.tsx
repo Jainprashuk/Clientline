@@ -2,7 +2,87 @@ import { useCallback, useEffect, useState } from 'react';
 import Layout from '../components/Layout';
 import SequenceEditor from '../components/SequenceEditor';
 import { useToast } from '../context/ToastContext';
-import { loadSequences, createSequence, updateSequence, type Sequence, type Variable } from '../lib/api';
+import { Link } from 'react-router-dom';
+import {
+  loadSequences, createSequence, updateSequence, loadDue, sendDueBatch, completeTask, loadConnections,
+  type Sequence, type Variable, type DueSummary,
+} from '../lib/api';
+
+/** What's due now and the button that sends it, batch after batch, with progress. */
+function DueCard({ due, gmail, onSent, onTaskDone }: {
+  due: DueSummary; gmail: string | null; onSent: (d: DueSummary) => void; onTaskDone: (d: DueSummary) => void;
+}) {
+  const toast = useToast();
+  const [sending, setSending] = useState<{ sent: number } | null>(null);
+  const [report, setReport] = useState<{ sent: number; skipped: { name: string; reason: string }[]; stoppedBy: string | null } | null>(null);
+  const total = due.first + due.followUps;
+  const send = async () => {
+    setSending({ sent: 0 }); setReport(null);
+    let sent = 0; const skipped: { name: string; reason: string }[] = []; let stoppedBy: string | null = null; let last = due;
+    try {
+      for (let round = 0; round < 20; round++) {
+        const r = await sendDueBatch();
+        sent += r.sent; skipped.push(...r.skipped); last = r.due; stoppedBy = r.stoppedBy;
+        setSending({ sent });
+        if (!r.more || r.stoppedBy || r.sent === 0) break;
+      }
+    } catch (e: any) { stoppedBy = e.message; }
+    setSending(null);
+    setReport({ sent, skipped, stoppedBy });
+    onSent(last);
+    toast(sent ? `Sent ${sent} email${sent === 1 ? '' : 's'}.` : stoppedBy || 'Nothing could be sent.', sent ? 'success' : 'info', 6000);
+  };
+  const done = async (id: string) => {
+    try { const r = await completeTask(id); onTaskDone(r.due); } catch (e: any) { toast(e.message, 'error'); }
+  };
+  return (
+    <div className="s-card" style={{ marginBottom: 16 }}>
+      <div className="s-head">
+        <div className="s-head-left">
+          <div className="s-icon"><i className="ti ti-send" /></div>
+          <div>
+            <div className="s-title">{total ? `${total} email${total === 1 ? '' : 's'} due now` : 'Nothing due right now'}</div>
+            <div className="s-sub">
+              {total ? `${due.first} first email${due.first === 1 ? '' : 's'} · ${due.followUps} follow-up${due.followUps === 1 ? '' : 's'} · ` : ''}
+              {due.sentToday} of {due.sendsPerDay} sent in the last 24 hours
+              {due.inPausedSequences ? ` · ${due.inPausedSequences} waiting in paused sequences` : ''}
+            </div>
+          </div>
+        </div>
+        {gmail ? (
+          <button className="btn btn-primary" type="button" disabled={!!sending || !total || !!due.pausedUntil} onClick={send}>
+            {sending ? <><i className="ti ti-loader" /> Sending… {sending.sent}</> : <><i className="ti ti-send" /> Send due emails</>}
+          </button>
+        ) : <Link className="btn btn-primary" to="/connections">Connect Gmail</Link>}
+      </div>
+      {(report || due.pausedUntil || due.tasks.length > 0 || (gmail && total > 0)) && (
+        <div className="s-body">
+          {gmail && total > 0 && !report && <div className="cl-hint" style={{ marginTop: 0 }}>Sends from {gmail}. Replies are checked first, so nobody who answered gets a follow-up.</div>}
+          {due.pausedUntil && <div className="cl-note">Gmail’s daily limit was reached. Sending waits until {new Date(due.pausedUntil).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}; nothing is lost.</div>}
+          {report && (
+            <div className="cl-meta" style={{ marginBottom: 6 }}>
+              <b>Sent {report.sent}</b>
+              {report.skipped.length > 0 && <span>· Not sent: {report.skipped.slice(0, 4).map(s => `${s.name} (${s.reason})`).join(', ')}{report.skipped.length > 4 ? '…' : ''}</span>}
+              {report.stoppedBy && <span style={{ color: 'var(--amber)' }}>· {report.stoppedBy}</span>}
+            </div>
+          )}
+          {due.tasks.length > 0 && (
+            <>
+              <div className="form-label" style={{ margin: '8px 0 6px' }}>Tasks for you</div>
+              {due.tasks.map(t => (
+                <div key={t.enrollmentId} className="cl-meta" style={{ padding: '6px 0' }}>
+                  <i className="ti ti-checkbox" /><span style={{ color: 'var(--text)' }}>{t.text}</span><span>— {t.lead} · {t.sequence}</span>
+                  <span style={{ flex: 1 }} />
+                  <button className="btn btn-sm" type="button" onClick={() => done(t.enrollmentId)}>Done</button>
+                </div>
+              ))}
+            </>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
 
 /** One sequence, in the prototype's card: status, people, reply rate, and each step's numbers. */
 function SequenceCard({ seq, onEdit, onToggle, busy }: { seq: Sequence; onEdit: () => void; onToggle: () => void; busy: boolean }) {
@@ -53,9 +133,13 @@ export default function Outreach() {
   const [error, setError] = useState<string | null>(null);
   const [editing, setEditing] = useState<string | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
+  const [due, setDue] = useState<DueSummary | null>(null);
+  const [gmail, setGmail] = useState<string | null>(null);
 
   const load = useCallback(() => {
     loadSequences().then(r => { setSeqs(r.sequences); setVariables(r.variables); setError(null); }).catch(e => setError(e.message));
+    loadDue().then(setDue).catch(() => {});
+    loadConnections().then(c => setGmail(c.gmail.email || null)).catch(() => {});
   }, []);
   useEffect(() => { load(); }, [load]);
 
@@ -78,6 +162,7 @@ export default function Outreach() {
       actions={<button className="btn" type="button" onClick={create}><i className="ti ti-plus" /> New sequence</button>}>
       {error && <div className="info-box danger"><i className="ti ti-alert-triangle" /> {error}</div>}
       {!seqs && !error && <div className="empty-state"><i className="ti ti-loader" />Loading…</div>}
+      {due && <DueCard due={due} gmail={gmail} onSent={d => { setDue(d); load(); }} onTaskDone={setDue} />}
       {seqs && seqs.map(s => (
         <SequenceCard key={s.id} seq={s} busy={busy === s.id} onEdit={() => setEditing(s.id)} onToggle={() => toggle(s)} />
       ))}

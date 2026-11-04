@@ -211,3 +211,14 @@ export interface LeadEnrollment {
 export const enrollLeads = (leadIds: string[], sequenceId: string) => apiFetch<EnrollResult>('/api/outreach/enroll', jsonBody({ leadIds, sequenceId }));
 export const stopLeads = (leadIds: string[]) => apiFetch<{ ok: boolean; stopped: number }>('/api/outreach/stop', jsonBody({ leadIds }));
 export const loadLeadEnrollment = (leadId: string) => apiFetch<{ enrollment: LeadEnrollment | null }>(`/api/outreach/lead/${leadId}`);
+
+// ── Outreach: sending ────────────────────────────────────────────────────────
+export interface DueTask { enrollmentId: string; leadId: string; lead: string; sequence: string; text: string }
+export interface DueSummary {
+  first: number; followUps: number; tasks: DueTask[]; inPausedSequences: number;
+  sentToday: number; sendsPerDay: number; roomToday: number; pausedUntil: string | null;
+}
+export interface SendResult { sent: number; skipped: { name: string; reason: string }[]; stoppedBy: string | null; pausedUntil: string | null; more: boolean; due: DueSummary }
+export const loadDue = () => apiFetch<DueSummary>('/api/outreach/due');
+export const sendDueBatch = () => apiFetch<SendResult>('/api/outreach/send', { method: 'POST' });
+export const completeTask = (enrollmentId: string) => apiFetch<{ ok: boolean; due: DueSummary }>(`/api/outreach/tasks/${enrollmentId}/done`, { method: 'POST' });

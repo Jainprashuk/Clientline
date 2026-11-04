@@ -63,6 +63,11 @@ const requireAuth = async (req, res, next) => {
 app.use('/api/auth', async (_req, res, next) => {
   try { await ensureDb(); next(); } catch (err) { res.status(503).json({ error: `Database not available: ${err.message}` }); }
 });
+// The unsubscribe link in outreach emails: public by design — the signed token is
+// the proof (routes/unsubscribe.js). Mounted ahead of requireAuth, exact prefix.
+app.use('/u', async (_req, res, next) => {
+  try { await ensureDb(); next(); } catch (err) { res.status(503).send('Please try again in a minute.'); }
+}, express.urlencoded({ extended: false }), require('./routes/unsubscribe'));
 app.use(requireAuth);
 app.use('/api/auth', authRoutes);
 app.use('/api/connections', require('./routes/connections'));

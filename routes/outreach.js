@@ -13,6 +13,7 @@ const Profile = require('../models/Profile');
 const Settings = require('../models/Settings');
 const { renderStep, whyBlocked, variablesIn, VARIABLES, STARTER } = require('../lib/outreach/render');
 const { enroll, stop, forLead } = require('../lib/outreach/enroll');
+const { sendDue, dueSummary, completeTask } = require('../lib/outreach/send');
 
 const router = express.Router();
 const validId = (id) => mongoose.isValidObjectId(id);
@@ -199,6 +200,37 @@ router.get('/lead/:leadId', async (req, res) => {
   if (!validId(req.params.leadId)) return res.status(404).json({ error: 'No such lead' });
   try {
     res.json({ enrollment: await forLead(req.userId, req.params.leadId) });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ── Sending (manual: the user presses "Send due emails") ────────────────────
+
+router.get('/due', async (req, res) => {
+  try {
+    res.json(await dueSummary(req.userId));
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+/** One batch, sized to finish inside a request. The page calls again while `more` is true. */
+router.post('/send', async (req, res) => {
+  try {
+    const r = await sendDue(req.userId);
+    res.json({ ...r, due: await dueSummary(req.userId) });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+router.post('/tasks/:enrollmentId/done', async (req, res) => {
+  if (!validId(req.params.enrollmentId)) return res.status(404).json({ error: 'No such task' });
+  try {
+    const ok = await completeTask(req.userId, req.params.enrollmentId);
+    if (!ok) return res.status(404).json({ error: 'That task is already done or gone.' });
+    res.json({ ok: true, due: await dueSummary(req.userId) });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }

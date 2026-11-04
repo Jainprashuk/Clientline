@@ -9,6 +9,7 @@ const sentEmailSchema = new mongoose.Schema({
   userId: { type: mongoose.Schema.Types.ObjectId, required: true },
   leadId: { type: mongoose.Schema.Types.ObjectId, default: null },
   enrollmentId: { type: mongoose.Schema.Types.ObjectId, default: null },
+  sequenceId: { type: mongoose.Schema.Types.ObjectId, default: null },
   conversationId: { type: mongoose.Schema.Types.ObjectId, default: null },
   kind: { type: String, enum: ['sequence', 'reply'], default: 'sequence' },
   step: { type: Number, default: null },
