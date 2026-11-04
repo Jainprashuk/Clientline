@@ -194,7 +194,7 @@ export interface Sequence { id: string; name: string; active: boolean; newPerDay
 export interface Variable { key: string; label: string }
 export interface StepPreview { ok: boolean; subject?: string | null; body?: string; why?: string }
 
-export const loadSequences = () => apiFetch<{ sequences: Sequence[]; variables: Variable[] }>('/api/outreach/sequences');
+export const loadSequences = () => apiFetch<{ sequences: Sequence[]; variables: Variable[]; missingYours: (Variable & { where: string })[] }>('/api/outreach/sequences');
 export const createSequence = (name: string) => apiFetch<Sequence>('/api/outreach/sequences', jsonBody({ name }));
 export const updateSequence = (id: string, patch: Partial<Pick<Sequence, 'name' | 'active' | 'newPerDay' | 'steps'>>) =>
   apiFetch<Sequence>(`/api/outreach/sequences/${id}`, jsonBody(patch, 'PUT'));

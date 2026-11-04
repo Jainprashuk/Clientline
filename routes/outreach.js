@@ -11,7 +11,7 @@ const SentEmail = require('../models/SentEmail');
 const Lead = require('../models/Lead');
 const Profile = require('../models/Profile');
 const Settings = require('../models/Settings');
-const { renderStep, whyBlocked, variablesIn, VARIABLES, STARTER } = require('../lib/outreach/render');
+const { renderStep, whyBlocked, variablesIn, missingYours, VARIABLES, STARTER } = require('../lib/outreach/render');
 const { enroll, stop, forLead } = require('../lib/outreach/enroll');
 const { startSendRun, stopRun, runForPanel } = require('../lib/outreach/runs');
 const { dueSummary, completeTask } = require('../lib/outreach/send');
@@ -79,8 +79,16 @@ router.get('/sequences', async (req, res) => {
     let seqs = await Sequence.find({ userId: req.userId }).sort({ createdAt: 1 }).lean();
     // Every account starts with one ready-made sequence.
     if (!seqs.length) seqs = [(await Sequence.create({ userId: req.userId, ...STARTER })).toObject()];
-    const stats = await statsFor(req.userId, seqs.map(s => s._id));
-    res.json({ sequences: seqs.map(s => view(s, stats[String(s._id)])), variables: VARIABLES });
+    const [stats, profile, settings] = await Promise.all([
+      statsFor(req.userId, seqs.map(s => s._id)),
+      Profile.findOne({ userId: req.userId }).lean(),
+      Settings.findOne({ userId: req.userId }, { senderName: 1, bookingUrl: 1 }).lean(),
+    ]);
+    res.json({
+      sequences: seqs.map(s => view(s, stats[String(s._id)])), variables: VARIABLES,
+      // Without these no lead can be added: every first email would have a gap.
+      missingYours: missingYours(seqs, profile, settings),
+    });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }

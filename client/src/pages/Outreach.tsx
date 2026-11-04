@@ -197,6 +197,7 @@ function SequenceCard({ seq, onEdit, onToggle, busy }: { seq: Sequence; onEdit: 
 export default function Outreach() {
   const toast = useToast();
   const [seqs, setSeqs] = useState<Sequence[] | null>(null);
+  const [missingYours, setMissingYours] = useState<{ key: string; label: string; where: string }[]>([]);
   const [variables, setVariables] = useState<Variable[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [editing, setEditing] = useState<string | null>(null);
@@ -205,7 +206,7 @@ export default function Outreach() {
   const [gmail, setGmail] = useState<string | null>(null);
 
   const load = useCallback(() => {
-    loadSequences().then(r => { setSeqs(r.sequences); setVariables(r.variables); setError(null); }).catch(e => setError(e.message));
+    loadSequences().then(r => { setSeqs(r.sequences); setVariables(r.variables); setMissingYours(r.missingYours || []); setError(null); }).catch(e => setError(e.message));
     loadDue().then(setDue).catch(() => {});
     loadConnections().then(c => setGmail(c.gmail.email || null)).catch(() => {});
   }, []);
@@ -230,6 +231,15 @@ export default function Outreach() {
       actions={<button className="btn" type="button" onClick={create}><i className="ti ti-plus" /> New sequence</button>}>
       {error && <div className="info-box danger"><i className="ti ti-alert-triangle" /> {error}</div>}
       {!seqs && !error && <div className="empty-state"><i className="ti ti-loader" />Loading…</div>}
+      {missingYours.length > 0 && (
+        <div className="info-box danger" style={{ marginBottom: 12 }}>
+          <i className="ti ti-alert-triangle" />
+          <div>
+            Your emails use details about you that aren’t filled in, so no lead can be added yet:
+            {missingYours.map(m => <div key={m.key}>· <b>{m.label}</b> — add it in {m.where.startsWith('My profile') ? <Link to="/profile">My profile</Link> : <Link to="/connections">{m.where}</Link>}</div>)}
+          </div>
+        </div>
+      )}
       {due && <DueCard due={due} gmail={gmail} onSent={d => { setDue(d); load(); }} onChanged={d => { setDue(d); load(); }} />}
       {seqs && seqs.map(s => (
         <SequenceCard key={s.id} seq={s} busy={busy === s.id} onEdit={() => setEditing(s.id)} onToggle={() => toggle(s)} />

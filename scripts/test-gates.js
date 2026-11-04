@@ -45,6 +45,13 @@ eq(v('I am a freelance dev', { ai: { needsFreelancer: true, selfPromo: false } }
 
 eq(v("hello everyone, i'm a full-stack developer who was recently laid off and looking for some quick work in React").verdict, 'drop', 'laid-off developer -> drop');
 eq(v('MSI is an India-based technology development partner offering React web app development').verdict, 'drop', 'agency describing itself -> drop');
+// The Iconceptz post: a list of services, then an offer to the reader. Even an AI reading
+// that called it a client request doesn't keep it.
+const iconceptz = 'corporate website design, UI/UX, responsive development, custom functionality, integrations, performance optimisation and ongoing maintenance. We can work on a new website or improve an existing one, depending on your needs.';
+eq(v(iconceptz).verdict, 'drop', 'agency offering to work on your website -> drop');
+eq(v(iconceptz, { ai: { needsFreelancer: true, selfPromo: false } }).verdict, 'drop', 'seller pitch overrules an AI reading');
+eq(v('We specialise in Shopify stores for D2C brands. DM us to discuss your project.').verdict, 'drop', 'we specialise in -> drop');
+eq(v('Looking for a freelance React developer to rebuild our checkout, contract role, budget flexible depending on your experience.').verdict === 'drop' && v('Looking for a freelance React developer to rebuild our checkout, contract role, budget flexible depending on your experience.').reason.includes('advertising'), false, 'a client mentioning "your experience" is not a pitch');
 eq(v('We are looking for a skilled ReactJS Developer to design and maintain our web app', { source: 'web-post' }).reason, 'Reads like a job opening, not freelance work', 'web job opening -> drop');
 eq(v('We are looking for a freelance ReactJS developer for a 6 week web app project', { source: 'web-post' }).verdict, 'keep', 'web freelance ask -> keep');
 
