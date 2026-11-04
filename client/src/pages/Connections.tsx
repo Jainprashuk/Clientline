@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import Layout from '../components/Layout';
 import { useToast } from '../context/ToastContext';
 import {
-  loadConnections, saveKey, removeKey, testKey,
+  loadConnections, saveKey, removeKey, testKey, setShareOutreach,
   type Connections as ConnectionsView, type KeyView, type Provider,
 } from '../lib/api';
 
@@ -48,8 +48,9 @@ const FREE_SOURCES = [
 ];
 
 function StatusPill({ view }: { view: KeyView }) {
-  if (!view.saved) return <span className="sr-ml badge badge-pending">Not added</span>;
+  if (!view.inUse) return <span className="sr-ml badge badge-pending">Not added</span>;
   const s = view.status;
+  if (view.from === 'outreach' && !s) return <span className="sr-ml badge badge-sent" title="The key you saved in Outreach">From Outreach</span>;
   if (s?.state === 'invalid') return <span className="sr-ml badge badge-rejected" title={s.error || ''}>Rejected</span>;
   if (s?.state === 'quota') return <span className="sr-ml badge badge-pending" title={s.error || ''}>Limit reached</span>;
   return <span className="sr-ml badge badge-sent">Working</span>;
@@ -68,7 +69,7 @@ function KeyRows({ rows, views, locked, data, busy, onSave, onRemove, onTest }: 
     <div className="sr-keylist">
       {rows.map((r, idx) => {
         const view = views[r.key];
-        const off = locked(r.key) && !view.saved;
+        const off = locked(r.key) && !view.inUse;
         const used = (data.usage as any)[r.key] as number | undefined;
         const cap = (data.usage.caps as any)[r.key] as number | undefined;
         return (
@@ -84,19 +85,22 @@ function KeyRows({ rows, views, locked, data, busy, onSave, onRemove, onTest }: 
               <a href={r.url} target="_blank" rel="noreferrer" className="sr-link">Get a free key <i className="ti ti-external-link" /></a>
               {' · '}
               <button type="button" className="btn-link sr-link sr-linkbtn" onClick={() => setOpen(open === r.key ? null : r.key)}>How?</button>
-              {view.saved && cap ? <> · {used ?? 0} of {cap} used this month</> : null}
+              {view.inUse && cap ? <> · {used ?? 0} of {cap} used here this month</> : null}
             </div>
             {open === r.key && <ol className="sr-steps">{r.steps.map(s => <li key={s}>{s}</li>)}</ol>}
             <div className="sr-keyinput">
               <input type="password" autoComplete="off" aria-label={`${r.name} API key`}
                 value={values[r.key] || ''} onChange={e => setValues(v => ({ ...v, [r.key]: e.target.value }))}
-                placeholder={off ? 'Add your Groq key first' : view.saved ? `Saved (…${view.last4}). Paste a new one to replace it` : 'Paste the key'}
+                placeholder={off ? 'Add your Groq key first'
+                  : view.saved ? `Saved (…${view.last4}). Paste a new one to replace it`
+                  : view.from === 'outreach' ? `Using your Outreach key (…${view.last4}). Paste one to use a different key here`
+                  : 'Paste the key'}
                 disabled={off}
                 onKeyDown={e => { if (e.key === 'Enter') save(r.key); }} />
               <button className="btn btn-primary" type="button" disabled={off || busy !== null || !(values[r.key] || '').trim()} onClick={() => save(r.key)}>
                 {busy === r.key ? <><i className="ti ti-loader" /> Checking…</> : view.saved ? 'Replace' : 'Save'}
               </button>
-              {view.saved && <button className="btn" type="button" disabled={busy !== null} onClick={() => onTest(r.key)}>Test</button>}
+              {view.inUse && <button className="btn" type="button" disabled={busy !== null} onClick={() => onTest(r.key)}>Test</button>}
               {view.saved && <button className="btn btn-danger" type="button" disabled={busy !== null} onClick={() => onRemove(r.key)}>Remove</button>}
             </div>
           </div>
@@ -130,6 +134,12 @@ export default function Connections() {
       return false;
     } finally { setBusy(null); }
   };
+  const onShare = async (on: boolean) => {
+    setBusy('share');
+    try { setData(await setShareOutreach(on)); toast(on ? 'Using your Outreach keys where none is added here.' : 'No longer using your Outreach keys.', 'success'); }
+    catch (e: any) { toast(e.message, 'error'); }
+    finally { setBusy(null); }
+  };
   const onRemove = async (p: Provider) => {
     if (!window.confirm('Remove this key? Anything that needs it stops until you add one again.')) return;
     setBusy(p);
@@ -153,6 +163,34 @@ export default function Connections() {
       {!data && !error && <div className="empty-state"><i className="ti ti-loader" />Loading…</div>}
       {data && (
         <>
+          {data.outreach.canShare && (
+            <div className="s-card" style={{ marginBottom: 16 }}>
+              <div className="s-head">
+                <div className="s-head-left">
+                  <div className="s-icon"><i className="ti ti-arrows-exchange" /></div>
+                  <div>
+                    <div className="s-title">Keys from Outreach</div>
+                    <div className="s-sub">
+                      {data.outreach.found.length
+                        ? `You have ${data.outreach.found.length} key${data.outreach.found.length === 1 ? '' : 's'} in Outreach: ${data.outreach.found.join(', ')}`
+                        : 'You have no keys saved in Outreach yet'}
+                    </div>
+                  </div>
+                </div>
+                <label style={{ display: 'flex', gap: 8, alignItems: 'center', fontSize: 13, cursor: 'pointer' }}>
+                  <input type="checkbox" checked={data.outreach.on} disabled={busy !== null} onChange={e => onShare(e.target.checked)} />
+                  Use my Outreach keys
+                </label>
+              </div>
+              <div className="s-body">
+                <div className="sr-intro" style={{ margin: 0 }}>
+                  Any connection without a key here uses the one you saved in Outreach, so you don’t add it twice. A key you add here always
+                  takes over, and Clientline never changes anything in Outreach. Searches made here and in Outreach share the same free allowance.
+                </div>
+              </div>
+            </div>
+          )}
+
           <div className="s-card" style={{ marginBottom: 16 }}>
             <div className="s-head">
               <div className="s-head-left">
@@ -169,7 +207,7 @@ export default function Connections() {
                 using only that lead’s facts and your profile. Leads are still found without it, just without first lines.
               </div>
               <KeyRows rows={AI} views={data.ai} data={data} busy={busy}
-                locked={p => p !== 'groq' && !data.ai.groq.saved}
+                locked={p => p !== 'groq' && !data.ai.groq.inUse}
                 onSave={onSave} onRemove={onRemove} onTest={onTest} />
             </div>
           </div>
@@ -180,7 +218,7 @@ export default function Connections() {
                 <div className="s-icon"><i className="ti ti-search" /></div>
                 <div>
                   <div className="s-title">Web search</div>
-                  <div className="s-sub">{data.search.tavily.saved || data.search.serpapi.saved ? 'Client posts are on' : 'Optional: turns on the client posts source'}</div>
+                  <div className="s-sub">{data.search.tavily.inUse || data.search.serpapi.inUse ? 'Client posts are on' : 'Optional: turns on the client posts source'}</div>
                 </div>
               </div>
             </div>

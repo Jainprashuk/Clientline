@@ -49,3 +49,29 @@
 .cl-menu button:hover:not(:disabled) { background: var(--canvas, var(--bg)); }
 .cl-menu button:disabled { opacity: .5; cursor: default; }
 .cl-menu small { display: block; color: var(--text3); font-size: 11.5px; }
+
+/* Drawer layout on Outreach's .user-drawer: a sticky head and foot around a scrolling body. */
+.cl-drawer { display: flex; flex-direction: column; padding: 0 !important; overflow: hidden !important; }
+.cl-drawer-head { display: flex; gap: 12px; align-items: flex-start; justify-content: space-between; padding: 18px 20px 14px; border-bottom: 1px solid var(--border); }
+.cl-drawer-head h2 { font-size: 17px; font-weight: 650; margin: 0; letter-spacing: -.01em; overflow-wrap: anywhere; }
+.cl-drawer-head p { font-size: 12.5px; color: var(--text2); margin: 3px 0 0; }
+.cl-drawer-body { flex: 1; overflow-y: auto; padding: 16px 20px; }
+.cl-drawer-foot { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; padding: 12px 20px calc(12px + env(safe-area-inset-bottom)); border-top: 1px solid var(--border); background: var(--bg); }
+.cl-drawer-foot .spacer { flex: 1; }
+.cl-why li { margin-bottom: 3px; font-size: 13px; }
+.cl-meta { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; font-size: 12.5px; color: var(--text2); }
+.cl-source { display: inline-block; font-size: 11.5px; font-weight: 600; padding: 2px 8px; border-radius: 999px; background: var(--bg3, var(--canvas)); color: var(--text2); white-space: nowrap; }
+.cl-row-sub { font-size: 12px; color: var(--text3); margin-top: 2px; }
+.cl-clamp { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.cl-table tbody tr { cursor: pointer; }
+.cl-table tbody tr:hover td { background: var(--canvas); }
+.cl-table td { vertical-align: top; }
+.cl-preview-row td { font-size: 12.5px; }
+.cl-verdict { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; }
+.cl-verdict.new { color: var(--green); } .cl-verdict.held { color: var(--amber); } .cl-verdict.drop { color: var(--text3); }
+
+/* Phones: the source chips stay chips (Outreach's filter-row stretches its buttons). */
+@media (max-width: 640px) {
+  .lr-filters .cl-toggles { flex: 1 1 100%; flex-wrap: wrap; }
+  .lr-filters .cl-toggles .cl-toggle { width: auto !important; flex: 0 0 auto !important; }
+}

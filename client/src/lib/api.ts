@@ -28,18 +28,28 @@ export type AiProvider = 'groq' | 'gemini' | 'cerebras';
 export type SearchProvider = 'tavily' | 'serpapi';
 export type Provider = AiProvider | SearchProvider;
 export interface KeyStatus { state: 'ok' | 'invalid' | 'quota'; checkedAt: string; error: string | null }
-export interface KeyView { saved: boolean; last4: string; status: KeyStatus | null }
+export interface KeyView {
+  saved: boolean;
+  /** A key is in use: saved here, or the user's Outreach key. */
+  inUse: boolean;
+  from: 'clientline' | 'outreach' | null;
+  last4: string;
+  inOutreach: boolean;
+  status: KeyStatus | null;
+}
 export interface Connections {
   ai: Record<AiProvider, KeyView>;
   search: Record<SearchProvider, KeyView>;
   usage: { month: string; tavily: number; serpapi: number; caps: Record<SearchProvider, number> };
   aiReady: boolean;
+  outreach: { canShare: boolean; on: boolean; found: Provider[] };
   warning?: string | null;
 }
 
 export const loadConnections = () => apiFetch<Connections>('/api/connections');
 export const saveKey = (p: Provider, key: string) => apiFetch<Connections>(`/api/connections/${p}`, jsonBody({ key }, 'PUT'));
 export const removeKey = (p: Provider) => apiFetch<Connections>(`/api/connections/${p}`, { method: 'DELETE' });
+export const setShareOutreach = (on: boolean) => apiFetch<Connections>('/api/connections/share', jsonBody({ on }, 'PUT'));
 export const testKey = (p: Provider) => apiFetch<Connections & { ok: boolean; error: string | null }>(`/api/connections/${p}/test`, { method: 'POST' });
 
 // ── My profile ───────────────────────────────────────────────────────────────
@@ -64,3 +74,79 @@ export interface ProfileView { profile: Profile; complete: boolean; missing: str
 
 export const loadProfile = () => apiFetch<ProfileView>('/api/profile');
 export const saveProfile = (p: Profile) => apiFetch<ProfileView>('/api/profile', jsonBody(p, 'PUT'));
+
+// ── Leads ────────────────────────────────────────────────────────────────────
+export type LeadStatus = 'new' | 'held' | 'approved' | 'discarded';
+export type LeadSource = 'paste' | 'hn' | 'news' | 'web-post';
+export type DiscardReason = 'not-my-service' | 'too-small' | 'agency-or-recruiter' | 'spam' | 'already-know' | 'bad-contact' | 'other';
+export interface Signal { text: string; source: string; url: string | null; at: string | null }
+export interface Lead {
+  id: string;
+  name: string;
+  person: string;
+  title: string;
+  email: string | null;
+  emailConfidence: 'high' | 'medium' | 'low' | null;
+  domain?: string | null;
+  source: LeadSource;
+  sourceType: 'asked' | 'trigger';
+  where: string;
+  postUrl?: string | null;
+  postedAt: string | null;
+  about?: string;
+  signals: Signal[];
+  budget?: { amount: number; currency: string; hourly: boolean } | null;
+  service: string;
+  fit: number;
+  fitWhy: string[];
+  opener: string;
+  openerSources?: string[];
+  openerState: 'none' | 'written' | 'edited' | 'failed' | 'skipped';
+  openerError?: string | null;
+  status: LeadStatus;
+  heldReason: string;
+  discardReason: DiscardReason | null;
+  createdAt: string;
+}
+export interface LeadList {
+  leads: Lead[];
+  total: number; page: number; limit: number; pages: number;
+  counts: Record<LeadStatus, number>;
+  weakHidden: number;
+}
+export interface LeadQuery { status: LeadStatus; source?: LeadSource | ''; q?: string; hideWeak?: boolean; page?: number }
+
+export function loadLeads(q: LeadQuery) {
+  const p = new URLSearchParams({ status: q.status, page: String(q.page || 1), limit: '50' });
+  if (q.source) p.set('source', q.source);
+  if (q.q) p.set('q', q.q);
+  if (q.hideWeak) p.set('hideWeak', '1');
+  return apiFetch<LeadList>(`/api/leads?${p}`);
+}
+export const loadLead = (id: string) => apiFetch<Lead>(`/api/leads/${id}`);
+export const saveOpener = (id: string, opener: string) => apiFetch<Lead>(`/api/leads/${id}`, jsonBody({ opener }, 'PATCH'));
+export const approveLead = (id: string) => apiFetch<Lead>(`/api/leads/${id}/approve`, { method: 'POST' });
+export const restoreLead = (id: string) => apiFetch<Lead>(`/api/leads/${id}/restore`, { method: 'POST' });
+export const discardLead = (id: string, reason: DiscardReason) => apiFetch<Lead>(`/api/leads/${id}/discard`, jsonBody({ reason }));
+
+// ── Sources ──────────────────────────────────────────────────────────────────
+export type RunnableSource = 'hn' | 'news' | 'web-post';
+export interface SourceRun {
+  id: string; source: LeadSource; label: string; trigger: 'manual' | 'cron';
+  status: 'running' | 'done' | 'partial' | 'failed';
+  startedAt: string; finishedAt: string | null; units: number; unitsDone: number;
+  read: number; created: number; held: number; updated: number; repeats: number; capped: number; dropped: number;
+  credits: number; error: string | null; reasons: { reason: string; n: number }[];
+}
+export interface SourceStatus { source: LeadSource; label: string; enabled: boolean; needs: string | null; lastRun: SourceRun | null }
+export interface SourcesView { profileComplete: boolean; missing: string[]; sources: SourceStatus[] }
+export interface PastePreviewRow {
+  name: string; text: string; verdict: 'new' | 'held' | 'drop'; reason: string;
+  fit?: number; fitWhy?: string[]; email?: string | null; emailConfidence?: string | null; service?: string;
+}
+export interface PastePreview { messages: number; considered: number; kept: number; held: number; dropped: number; reasons: Record<string, number>; preview: PastePreviewRow[] }
+
+export const loadSources = () => apiFetch<SourcesView>('/api/sources');
+export const runSource = (source: RunnableSource) => apiFetch<{ run: SourceRun }>('/api/sources/run', jsonBody({ source }));
+export const previewPaste = (text: string) => apiFetch<PastePreview>('/api/sources/paste/preview', jsonBody({ text }));
+export const importPaste = (text: string) => apiFetch<{ run: SourceRun }>('/api/sources/paste/import', jsonBody({ text }));

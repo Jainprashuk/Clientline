@@ -1,0 +1,241 @@
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { Link } from 'react-router-dom';
+import Layout from '../components/Layout';
+import HoverCard from '../components/HoverCard';
+import LeadDrawer from '../components/LeadDrawer';
+import PasteDrawer from '../components/PasteDrawer';
+import { useToast } from '../context/ToastContext';
+import {
+  loadLeads, loadSources, runSource,
+  type Lead, type LeadList, type LeadSource, type LeadStatus, type RunnableSource, type SourceRun, type SourcesView,
+} from '../lib/api';
+import { CONFIDENCE, SOURCE_LABEL, STATUS_LABEL, STATUS_NOTE, fitClass, timeAgo, whoLine } from '../lib/leads';
+
+const TABS: LeadStatus[] = ['new', 'held', 'approved', 'discarded'];
+const SOURCES: LeadSource[] = ['paste', 'hn', 'news', 'web-post'];
+const RUNNABLE: { source: RunnableSource; icon: string; note: string }[] = [
+  { source: 'hn', icon: 'ti-brand-ycombinator', note: 'Contract roles and client posts from this month’s HN threads' },
+  { source: 'news', icon: 'ti-news', note: 'Companies that just raised money, with a contact from their site' },
+  { source: 'web-post', icon: 'ti-world-search', note: 'Recent posts asking for a freelancer, on your search key' },
+];
+
+/** "3 new · 12 skipped: 8 not your service, …" */
+function runSummary(r: SourceRun) {
+  const parts = [`${r.created} new`];
+  if (r.held) parts.push(`${r.held} without email`);
+  if (r.dropped) parts.push(`${r.dropped} skipped`);
+  return parts.join(' · ');
+}
+
+function FindLeads({ sources, busy, onRun }: { sources: SourcesView | null; busy: RunnableSource | null; onRun: (s: RunnableSource) => void }) {
+  const [open, setOpen] = useState(false);
+  const wrap = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!open) return;
+    const close = (e: MouseEvent) => { if (wrap.current && !wrap.current.contains(e.target as Node)) setOpen(false); };
+    const esc = (e: KeyboardEvent) => { if (e.key === 'Escape') setOpen(false); };
+    document.addEventListener('mousedown', close); document.addEventListener('keydown', esc);
+    return () => { document.removeEventListener('mousedown', close); document.removeEventListener('keydown', esc); };
+  }, [open]);
+  return (
+    <div ref={wrap} style={{ position: 'relative' }}>
+      <button className="btn btn-primary" type="button" aria-haspopup="menu" aria-expanded={open} disabled={!!busy} onClick={() => setOpen(o => !o)}>
+        {busy ? <><i className="ti ti-loader" /> Finding…</> : <><i className="ti ti-search" /> Find leads <i className="ti ti-chevron-down" /></>}
+      </button>
+      {open && (
+        <div className="cl-menu" role="menu">
+          {RUNNABLE.map(r => {
+            const st = sources?.sources.find(s => s.source === r.source);
+            const last = st?.lastRun;
+            return (
+              <button key={r.source} type="button" role="menuitem" disabled={!!st?.needs}
+                onClick={() => { setOpen(false); onRun(r.source); }}>
+                <i className={`ti ${r.icon}`} style={{ fontSize: 17, marginTop: 1 }} />
+                <span>
+                  {st?.label || SOURCE_LABEL[r.source]}
+                  <small>{st?.needs || r.note}</small>
+                  {last && !st?.needs && <small>Last run {timeAgo(last.finishedAt || last.startedAt)}: {last.status === 'failed' ? last.error : runSummary(last)}</small>}
+                </span>
+              </button>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
+export default function Leads() {
+  const toast = useToast();
+  const [status, setStatus] = useState<LeadStatus>('new');
+  const [source, setSource] = useState<LeadSource | ''>('');
+  const [q, setQ] = useState('');
+  const [query, setQuery] = useState('');
+  const [hideWeak, setHideWeak] = useState(true);
+  const [page, setPage] = useState(1);
+  const [list, setList] = useState<LeadList | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [sources, setSources] = useState<SourcesView | null>(null);
+  const [openId, setOpenId] = useState<string | null>(null);
+  const [pasting, setPasting] = useState(false);
+  const [running, setRunning] = useState<RunnableSource | null>(null);
+  const [lastRun, setLastRun] = useState<SourceRun | null>(null);
+
+  // Typing settles for a moment before it searches.
+  useEffect(() => { const t = setTimeout(() => { setQuery(q.trim()); setPage(1); }, 300); return () => clearTimeout(t); }, [q]);
+
+  const refresh = useCallback(async () => {
+    setLoading(true);
+    try {
+      setList(await loadLeads({ status, source, q: query, hideWeak: hideWeak && (status === 'new' || status === 'held'), page }));
+      setError(null);
+    } catch (e: any) { setError(e.message); }
+    finally { setLoading(false); }
+  }, [status, source, query, hideWeak, page]);
+
+  useEffect(() => { refresh(); }, [refresh]);
+  const refreshSources = useCallback(() => loadSources().then(setSources).catch(() => {}), []);
+  useEffect(() => { refreshSources(); }, [refreshSources]);
+
+  const run = async (s: RunnableSource) => {
+    setRunning(s);
+    try {
+      const { run: r } = await runSource(s);
+      setLastRun(r);
+      if (r.status === 'failed') toast(r.error || 'That source did not answer.', 'error', 7000);
+      else toast(`${r.label}: ${runSummary(r)}${r.status === 'partial' ? ' — the rest continues next run' : ''}.`, r.created ? 'success' : 'info', 6000);
+      setStatus('new'); setPage(1);
+      await Promise.all([refresh(), refreshSources()]);
+    } catch (e: any) { toast(e.message, 'error', 7000); }
+    finally { setRunning(null); }
+  };
+
+  const onChanged = (l: Lead) => {
+    // A decision moves it to another tab; refresh the counts and this tab.
+    if (list && list.leads.some(x => x.id === l.id && x.status !== l.status)) refresh();
+    else setList(prev => prev && { ...prev, leads: prev.leads.map(x => (x.id === l.id ? { ...x, ...l } : x)) });
+  };
+
+  const profileMissing = sources && !sources.profileComplete;
+  const counts = list?.counts;
+
+  return (
+    <Layout title="Leads" subtitle="People who need what you sell, found from free sources. Open one to see why it fits and who to write to."
+      actions={
+        <div style={{ display: 'flex', gap: 8 }}>
+          <button className="btn" type="button" disabled={!!profileMissing} onClick={() => setPasting(true)}><i className="ti ti-clipboard-text" /> Paste a chat or post</button>
+          <FindLeads sources={sources} busy={running} onRun={run} />
+        </div>
+      }>
+      {profileMissing && (
+        <div className="info-box" style={{ marginBottom: 14 }}>
+          <i className="ti ti-info-circle" style={{ fontSize: 15, flexShrink: 0 }} />
+          <div>Leads are judged against your profile. Add {sources!.missing.join(', ')} in <Link to="/profile">My profile</Link> to start.</div>
+        </div>
+      )}
+
+      {lastRun && lastRun.reasons.length > 0 && (
+        <div className="cl-runs" aria-live="polite">
+          <span className="cl-run"><b>{lastRun.label}</b> {runSummary(lastRun)}</span>
+          {lastRun.reasons.slice(0, 4).map(r => <span className="cl-run" key={r.reason}>{r.n} × {r.reason}</span>)}
+          <button type="button" className="btn btn-xs" aria-label="Hide" onClick={() => setLastRun(null)}><i className="ti ti-x" /></button>
+        </div>
+      )}
+
+      <nav className="lr-cards" aria-label="Lead views">
+        {TABS.map(t => (
+          <button key={t} type="button" className={`lr-card${status === t ? ' on' : ''}`} aria-pressed={status === t}
+            onClick={() => { setStatus(t); setPage(1); }}>
+            <span className="lr-card-label">{STATUS_LABEL[t]}</span>
+            <span className="lr-card-row">
+              <span className="lr-card-count">{counts ? counts[t] : '–'}</span>
+              <span className="lr-card-note" style={{ color: 'var(--text3)' }}>{STATUS_NOTE[t]}</span>
+            </span>
+          </button>
+        ))}
+      </nav>
+
+      <div className="filter-row lr-filters" style={{ display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'center', marginBottom: 12 }}>
+        <label className="lr-search">
+          <i className="ti ti-search" />
+          <input type="search" aria-label="Search leads" placeholder="Search name, email or text" value={q} onChange={e => setQ(e.target.value)} />
+        </label>
+        <div className="cl-toggles" role="group" aria-label="Source">
+          <button type="button" className="cl-toggle" aria-pressed={source === ''} onClick={() => { setSource(''); setPage(1); }}>All sources</button>
+          {SOURCES.map(s => (
+            <button key={s} type="button" className="cl-toggle" aria-pressed={source === s} onClick={() => { setSource(s); setPage(1); }}>{SOURCE_LABEL[s]}</button>
+          ))}
+        </div>
+        {(status === 'new' || status === 'held') && (
+          <label style={{ display: 'flex', gap: 6, alignItems: 'center', fontSize: 13, marginLeft: 'auto' }}>
+            <input type="checkbox" checked={hideWeak} onChange={e => { setHideWeak(e.target.checked); setPage(1); }} />
+            Hide weak fits{list && list.weakHidden ? ` (${list.weakHidden})` : ''}
+          </label>
+        )}
+      </div>
+
+      <div className={`table-card lr-table cl-table${loading ? ' refreshing-wrap is-refreshing' : ''}`}>
+        <table>
+          <thead>
+            <tr><th>Fit</th><th>Who</th><th>Why now</th><th>Source</th><th>Email</th><th>Found</th></tr>
+          </thead>
+          <tbody>
+            {error && <tr><td colSpan={6}><div className="empty-state"><i className="ti ti-alert-triangle" />{error}</div></td></tr>}
+            {!error && list && !list.leads.length && (
+              <tr><td colSpan={6}><div className="empty-state">
+                <i className="ti ti-target-arrow" />
+                {query || source ? 'No leads match. Clear the search or pick All sources.'
+                  : status === 'new' ? <>No leads to review yet. Use <b>Find leads</b> or paste a chat export.</>
+                  : status === 'held' ? 'Nothing waiting for an email.'
+                  : status === 'approved' ? 'Nothing approved yet.' : 'Nothing discarded.'}
+              </div></td></tr>
+            )}
+            {list && list.leads.map(l => (
+              <tr key={l.id} tabIndex={0} onClick={() => setOpenId(l.id)} onKeyDown={e => { if (e.key === 'Enter') setOpenId(l.id); }}>
+                <td>
+                  <HoverCard align="left" width={300} trigger={
+                    <span className={fitClass(l.fit)}>{l.fit}<span className="cl-fit-bar"><i style={{ width: `${l.fit}%` }} /></span></span>
+                  }>
+                    <div style={{ fontSize: 12.5, lineHeight: 1.6 }}>{l.fitWhy.map((w, i) => <div key={i}>{w}</div>)}</div>
+                  </HoverCard>
+                </td>
+                <td style={{ minWidth: 160 }}>
+                  <div style={{ fontWeight: 600 }}>{l.name}</div>
+                  <div className="cl-row-sub">{whoLine(l)}</div>
+                </td>
+                <td style={{ maxWidth: 380, whiteSpace: 'normal' }}>
+                  <div className="cl-clamp" style={{ fontSize: 13 }}>{(l.signals[0] || {}).text || l.heldReason}</div>
+                </td>
+                <td><span className="cl-source">{SOURCE_LABEL[l.source]}</span></td>
+                <td>
+                  {l.email && l.emailConfidence
+                    ? <span className={`badge ${CONFIDENCE[l.emailConfidence].cls}`} title={`${l.email} — ${CONFIDENCE[l.emailConfidence].tip}`}>{CONFIDENCE[l.emailConfidence].label}</span>
+                    : <span className="cl-row-sub" style={{ margin: 0 }}>None yet</span>}
+                </td>
+                <td style={{ color: 'var(--text3)', fontSize: 12.5, whiteSpace: 'nowrap' }}>{timeAgo(l.createdAt)}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+
+      {list && list.pages > 1 && (
+        <div className="lr-foot">
+          <span>{list.total} leads · page {list.page} of {list.pages}</span>
+          <span style={{ display: 'flex', gap: 6 }}>
+            <button className="btn btn-sm" type="button" disabled={page <= 1} onClick={() => setPage(p => p - 1)}>Previous</button>
+            <button className="btn btn-sm" type="button" disabled={page >= list.pages} onClick={() => setPage(p => p + 1)}>Next</button>
+          </span>
+        </div>
+      )}
+
+      {openId && <LeadDrawer id={openId} onClose={() => setOpenId(null)} onChanged={onChanged} />}
+      {pasting && (
+        <PasteDrawer onClose={() => setPasting(false)} onImported={(r) => {
+          setPasting(false); setLastRun(r); setStatus('new'); setPage(1); refresh(); refreshSources();
+        }} />
+      )}
+    </Layout>
+  );
+}
