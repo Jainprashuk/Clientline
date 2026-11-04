@@ -10,6 +10,7 @@ import './styles/responsive.css';
 import './styles/polish.css';
 import './styles/settings-redesign.css';
 import './styles/leads-redesign.css';
+import './styles/clientline.css';
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>

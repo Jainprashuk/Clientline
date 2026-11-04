@@ -58,7 +58,7 @@ settingsSchema.statics.forUser = function forUser(userId) {
   return this.findOneAndUpdate(
     { userId },
     { $setOnInsert: { userId } },
-    { upsert: true, new: true, setDefaultsOnInsert: true },
+    { upsert: true, returnDocument: 'after', setDefaultsOnInsert: true },
   );
 };
 

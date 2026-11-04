@@ -1,0 +1,51 @@
+/* Clientline's own pieces, on Outreach's tokens (theme.css). */
+
+/* Chip input: typed phrases as removable chips. */
+.cl-chips { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; padding: 6px 8px; min-height: 38px;
+  border: 1px solid var(--border); border-radius: var(--radius); background: var(--bg); }
+.cl-chips:focus-within { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-bg); }
+.cl-chips input[type=text] { border: 0 !important; box-shadow: none !important; padding: 2px 4px !important; min-width: 120px; flex: 1; background: transparent; }
+.cl-chip { display: inline-flex; align-items: center; gap: 4px; padding: 3px 8px; border-radius: 999px; font-size: 12px;
+  background: var(--accent-bg); color: var(--accent); font-weight: 550; }
+.cl-chip button { border: 0; background: none; color: inherit; cursor: pointer; padding: 0; display: inline-flex; opacity: .7; }
+.cl-chip button:hover { opacity: 1; }
+
+/* Toggle chips: pick-from-a-list options. */
+.cl-toggles { display: flex; flex-wrap: wrap; gap: 6px; }
+.cl-toggle { padding: 5px 11px; border-radius: 999px; font-size: 12.5px; border: 1px solid var(--border); background: transparent;
+  color: var(--text2); cursor: pointer; font-weight: 550; }
+.cl-toggle[aria-pressed="true"] { background: var(--accent-bg); color: var(--accent); border-color: transparent; }
+.cl-suggest { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; font-size: 12px; color: var(--text3); align-items: center; }
+.cl-suggest button { border: 1px dashed var(--border); background: none; border-radius: 999px; padding: 2px 9px; font-size: 12px; color: var(--text2); cursor: pointer; }
+
+/* Repeating rows (services, proof, cases). */
+.cl-row { display: grid; gap: 10px; padding: 12px; border: 1px solid var(--border); border-radius: var(--radius); margin-bottom: 10px; position: relative; }
+.cl-row-remove { position: absolute; top: 8px; right: 8px; }
+.cl-cols { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px; }
+.cl-hint { font-size: 12px; color: var(--text3); margin-top: 4px; line-height: 1.5; }
+.cl-savebar { position: sticky; bottom: 0; display: flex; gap: 10px; align-items: center; justify-content: flex-end;
+  padding: 12px 0; background: linear-gradient(to top, var(--canvas, var(--bg)) 70%, transparent); }
+
+/* Leads: fit bar, signals, drawer sections. */
+.cl-fit { display: inline-flex; align-items: center; gap: 8px; font-variant-numeric: tabular-nums; font-weight: 600; font-size: 13px; }
+.cl-fit-bar { width: 54px; height: 6px; border-radius: 99px; background: var(--border); overflow: hidden; }
+.cl-fit-bar i { display: block; height: 100%; border-radius: 99px; background: var(--accent); }
+.cl-fit.hi .cl-fit-bar i { background: var(--green); }
+.cl-fit.lo .cl-fit-bar i { background: var(--amber); }
+.cl-sect { padding: 14px 0; border-top: 1px solid var(--border); }
+.cl-sect:first-child { border-top: 0; padding-top: 0; }
+.cl-sect h3 { font-size: 12px; text-transform: uppercase; letter-spacing: .06em; color: var(--text3); margin: 0 0 8px; font-weight: 650; }
+.cl-signal { padding: 8px 10px; border-radius: 8px; background: var(--canvas, var(--bg)); margin-bottom: 6px; font-size: 13px; line-height: 1.5; }
+.cl-signal .src { font-size: 11.5px; color: var(--text3); margin-top: 2px; }
+.cl-signal .src a { color: var(--accent); }
+.cl-note { font-size: 12px; color: var(--amber); background: var(--amber-bg); padding: 8px 10px; border-radius: 8px; margin-top: 8px; line-height: 1.5; }
+.cl-opener { width: 100%; min-height: 96px; resize: vertical; }
+.cl-runs { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 14px; }
+.cl-run { font-size: 12px; color: var(--text2); border: 1px solid var(--border); border-radius: 999px; padding: 4px 10px; display: inline-flex; gap: 6px; align-items: center; }
+.cl-run.failed { color: var(--red, #c0392b); }
+.cl-menu { position: absolute; right: 0; top: calc(100% + 6px); z-index: 40; min-width: 240px; background: var(--bg); border: 1px solid var(--border);
+  border-radius: 10px; box-shadow: var(--shadow-md); padding: 6px; }
+.cl-menu button { width: 100%; text-align: left; display: flex; gap: 8px; align-items: flex-start; padding: 8px 10px; border: 0; background: none; border-radius: 7px; cursor: pointer; color: var(--text); font-size: 13px; }
+.cl-menu button:hover:not(:disabled) { background: var(--canvas, var(--bg)); }
+.cl-menu button:disabled { opacity: .5; cursor: default; }
+.cl-menu small { display: block; color: var(--text3); font-size: 11.5px; }

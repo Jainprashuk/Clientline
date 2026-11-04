@@ -4,10 +4,12 @@ import { useSession } from './context/SessionContext';
 import { SECTIONS } from './nav';
 import ComingSoon from './pages/ComingSoon';
 import Connections from './pages/Connections';
+import Profile from './pages/Profile';
 
 // Built sections; every other one is still a ComingSoon placeholder.
 const PAGES: Record<string, () => JSX.Element> = {
   '/connections': Connections,
+  '/profile': Profile,
 };
 
 // Signed-out visitors go to the login page, which is served outside the SPA,

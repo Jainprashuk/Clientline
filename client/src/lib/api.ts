@@ -41,3 +41,26 @@ export const loadConnections = () => apiFetch<Connections>('/api/connections');
 export const saveKey = (p: Provider, key: string) => apiFetch<Connections>(`/api/connections/${p}`, jsonBody({ key }, 'PUT'));
 export const removeKey = (p: Provider) => apiFetch<Connections>(`/api/connections/${p}`, { method: 'DELETE' });
 export const testKey = (p: Provider) => apiFetch<Connections & { ok: boolean; error: string | null }>(`/api/connections/${p}/test`, { method: 'POST' });
+
+// ── My profile ───────────────────────────────────────────────────────────────
+export interface Service { name: string; keywords: string[]; minBudget: number }
+export interface Profile {
+  name: string;
+  headline: string;
+  services: Service[];
+  currency: 'INR' | 'USD' | 'EUR' | 'GBP';
+  rate: number;
+  minProject: number;
+  clientTypes: string[];
+  companySizes: string[];
+  locations: string[];
+  remoteOk: boolean;
+  exclusions: string[];
+  proof: { who: string; text: string }[];
+  cases: { title: string; result: string; url: string }[];
+  sources: { hn: boolean; news: boolean; web: boolean; webPerDay: number };
+}
+export interface ProfileView { profile: Profile; complete: boolean; missing: string[] }
+
+export const loadProfile = () => apiFetch<ProfileView>('/api/profile');
+export const saveProfile = (p: Profile) => apiFetch<ProfileView>('/api/profile', jsonBody(p, 'PUT'));
