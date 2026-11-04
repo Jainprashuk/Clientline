@@ -1,0 +1,136 @@
+const mongoose = require('mongoose');
+const authDb = require('../lib/authDb');
+const { APP, APPS } = require('../lib/apps');
+
+const userSchema = new mongoose.Schema({
+  email: { type: String, required: true, lowercase: true, trim: true },
+  // Legacy. Sign-in is an emailed one-time code now (lib/loginCode.js); nothing
+  // reads this any more. No longer required, because an invited account never
+  // has one. Dropped for good by scripts/migrate-otp-auth.js --drop-passwords,
+  // deliberately a later run so the OTP deploy stays reversible.
+  passwordHash: { type: String, default: null },
+  name: { type: String, default: '' },
+  lastLoginAt: { type: Date, default: null },
+  // The first completed sign-in, written once with $min. The setup reminder
+  // counts its five days from here. Accounts that signed in before this field
+  // existed fall back to onboarding.startedAt, then lastLoginAt.
+  firstLoginAt: { type: Date, default: null },
+  // Last time a person (a session, never cron/worker/share) hit the API. Written
+  // at most once an hour — see touchActivity in lib/lifecycle/activity.js.
+  lastActiveAt: { type: Date, default: null },
+
+  // Lifecycle email controls. Both are lists of what is OFF, so that a missing
+  // field — every account that existed before this — reads as "all on" under
+  // .lean(), which never applies schema defaults.
+  //   emailOptOut          the user's own choices: 'reminders', 'weekly-report'
+  //   emailBlockedByAdmin  email TYPES an admin switched off for this user only
+  emailOptOut: { type: [String], default: [] },
+  emailBlockedByAdmin: { type: [String], default: [] },
+
+  // Two tiers, not a role system: everyone, and the person who can see the
+  // per-account totals. An enum here would invite a third tier nobody has
+  // designed for.
+  //
+  // Backfilled explicitly by scripts/migrate-otp-auth.js rather than left to
+  // this default. `.lean()` reads never apply schema defaults, so a row written
+  // before this field existed reads back as `undefined` — which is why every
+  // check must be `isAdmin === true`, never `isAdmin !== false`.
+  isAdmin: { type: Boolean, default: false },
+
+  // Shared Library (routes/library.js). Two separate switches:
+  //   libraryAccess  — an admin let this account SEE the Library tab. Off unless
+  //                    turned on; admins always see it. Check `=== true`.
+  //   libraryOptOut  — the user's own choice to keep THEIR data out of it. A
+  //                    missing field means shared, so check `!== true`.
+  // Neither is backfilled: .lean() reads a missing field as undefined, and both
+  // checks are written so that undefined means the default.
+  libraryAccess: { type: Boolean, default: false },
+  libraryOptOut: { type: Boolean, default: false },
+  // An admin let this account use the owner's AI keys when it has none of its
+  // own (lib/ai/keys.js). Off unless turned on; check `=== true`.
+  aiOwnerFallback: { type: Boolean, default: false },
+
+  // Which products this account may sign in to — see lib/apps.js. The account
+  // store is shared with Clientline, so "an account exists" no longer means
+  // "an Outreach user": check hasApp(), and sweep with inApp(). Backfilled to
+  // ['outreach'] for every account that predates it (db.js).
+  apps: { type: [{ type: String, enum: APPS }], default: () => [APP], index: true },
+
+  // invited  — an admin whitelisted the address; has never signed in
+  // active   — has completed at least one sign-in
+  // disabled — access revoked, data kept
+  //
+  // This replaces passwordHash's old implicit role as the "is this account
+  // usable" bit, and gives revocation somewhere to live that isn't deleting the
+  // row — which would orphan documents across sixteen collections.
+  status: { type: String, enum: ['invited', 'active', 'disabled'], default: 'invited', index: true },
+  invitedAt: { type: Date, default: null },
+  invitedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },
+
+  // First-run setup state. Kept on User rather than Settings for three reasons:
+  // Settings is the document with the duplicate hazard, /api/share/session
+  // already loads a User so the gate costs no extra round trip, and only an
+  // explicit stamp survives the user later deleting every template.
+  onboarding: {
+    startedAt: { type: Date, default: null },
+    completedAt: { type: Date, default: null },
+    step: { type: Number, default: 0 },
+    skipped: { type: [String], default: [] },
+    // Bump ONBOARDING_VERSION to make an existing account re-run a future wizard.
+    version: { type: Number, default: 0 },
+  },
+  // SHA-256 of this account's scrape-worker token. The worker on the Mac has no
+  // cookie, so it authenticates with a bearer token that identifies WHICH
+  // account's runs it is claiming — see lib/workerAuth.js.
+  workerTokenHash: { type: String, default: null },
+  // The link to this account's browser on the cloud VM (deploy/cloud-worker),
+  // set by an admin. No default on purpose: unset means "runs on their own
+  // computer", and nothing is indexed on it.
+  cloudScreenUrl: { type: String },
+  // When the user agreed, in the portal, to their job-site logins being kept
+  // on the cloud VM (routes/scrapes.js cloud-consent). Cleared whenever the
+  // link changes or is removed, so a new browser is agreed to again.
+  cloudConsentAt: { type: Date },
+  // Last request from a person in the portal, minute granularity
+  // (lib/portalPresence.js). No default: unset means "not seen yet".
+  portalSeenAt: { type: Date },
+  // SHA-256 of this account's read-only export link token — see lib/shareAuth.js.
+  shareTokenHash: { type: String, default: null },
+}, { timestamps: true });
+
+userSchema.index({ email: 1 }, { unique: true });
+// Partial, NOT sparse. These fields default to null, which means they are
+// PRESENT on every account that has not registered a token — and a sparse index
+// only skips documents where the field is ABSENT. So under `sparse` the nulls
+// were all indexed, collided with each other, and the second tokenless account
+// could not be created at all. Filtering on $type: 'string' indexes real tokens
+// only, which is what sparse was reaching for.
+//
+// scripts/migrate-otp-auth.js drops the old sparse indexes: mongoose builds
+// these but never removes a superseded one.
+userSchema.index(
+  { workerTokenHash: 1 },
+  { unique: true, partialFilterExpression: { workerTokenHash: { $type: 'string' } } },
+);
+userSchema.index(
+  { shareTokenHash: 1 },
+  { unique: true, partialFilterExpression: { shareTokenHash: { $type: 'string' } } },
+);
+
+userSchema.set('toJSON', {
+  transform: (doc, ret) => {
+    ret.id = ret._id.toString();
+    delete ret._id;
+    delete ret.__v;
+    delete ret.passwordHash;
+    ret.hasWorkerToken = !!ret.workerTokenHash;
+    delete ret.workerTokenHash;
+    ret.hasShareToken = !!ret.shareTokenHash;
+    delete ret.shareTokenHash;
+    return ret;
+  }
+});
+
+// The shared account store (lib/authDb.js) — the one line that differs from
+// Outreach's copy, which registers on its own default connection.
+module.exports = authDb.model('User', userSchema);

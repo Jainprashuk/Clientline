@@ -1,0 +1,6 @@
+/instructions.txt
+/claudemd
+node_modules/
+.env
+.DS_Store
+.env.vercel

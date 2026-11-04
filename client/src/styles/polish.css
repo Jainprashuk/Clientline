@@ -1,0 +1,804 @@
+/* ============================================================================
+   OUTREACH — detail pass
+   Loads last. Fixes the small things the base sheet, the Aurora theme and the
+   mobile sheet each left open: inert spinners, unstyled date inputs, native
+   blue checkboxes, fixed furniture that stacks on top of itself, and a set of
+   affordances (scroll hints, focus rings, tap targets) that were missing.
+   Pure presentation — no class names, IDs or behaviour hooks are changed.
+   ============================================================================ */
+
+/* ── Loading spinners ──────────────────────────────────────────────────────
+   Every busy state in the app renders a Tabler loader glyph, but only some of
+   them carried an inline `animation: spin`, so half the app's spinners sat
+   frozen. The glyph itself means "loading" nowhere else, so animating it by
+   name is safe and removes the need to remember the inline style. */
+.ti-loader, .ti-loader-2, .ti-loader-3 {
+  animation: spin 1s linear infinite;
+  display: inline-block;
+}
+
+/* ── Form controls ─────────────────────────────────────────────────────────
+   Checkboxes, radios and range inputs were painting themselves the OS blue
+   next to a violet UI. */
+input[type=checkbox], input[type=radio], input[type=range], progress {
+  accent-color: var(--accent);
+}
+input[type=checkbox], input[type=radio] { cursor: pointer; }
+
+/* Date and time fields now pick up the shared input styling (see css/style.css),
+   which leaves only the native calendar/clock button, still drawn in the OS
+   colour. Tinting it to the text colour keeps it from reading as a second,
+   competing accent. */
+input[type=date], input[type=time], input[type=datetime-local], input[type=month] {
+  min-height: 34px;                      /* native pickers ignore padding alone */
+}
+input[type=date]::-webkit-calendar-picker-indicator,
+input[type=time]::-webkit-calendar-picker-indicator,
+input[type=month]::-webkit-calendar-picker-indicator,
+input[type=datetime-local]::-webkit-calendar-picker-indicator {
+  opacity: .55; cursor: pointer;
+  filter: grayscale(1);
+  transition: opacity .12s var(--ease);
+}
+input[type=date]:hover::-webkit-calendar-picker-indicator,
+input[type=time]:hover::-webkit-calendar-picker-indicator,
+input[type=month]:hover::-webkit-calendar-picker-indicator,
+input[type=datetime-local]:hover::-webkit-calendar-picker-indicator { opacity: 1; }
+[data-theme="dark"] input[type=date]::-webkit-calendar-picker-indicator,
+[data-theme="dark"] input[type=time]::-webkit-calendar-picker-indicator,
+[data-theme="dark"] input[type=month]::-webkit-calendar-picker-indicator,
+[data-theme="dark"] input[type=datetime-local]::-webkit-calendar-picker-indicator {
+  filter: grayscale(1) invert(1);
+}
+
+/* A disabled control should look inert to the pointer as well as the eye. */
+input:disabled, select:disabled, textarea:disabled { cursor: not-allowed; }
+
+/* Matches the hover affordance every other control has. */
+textarea:hover:not(:focus) { border-color: var(--text3); }
+
+/* ── Buttons ───────────────────────────────────────────────────────────────
+   Icon-only and text buttons sat at different heights because the icon line
+   box is taller than the label's. A floor on each size keeps a toolbar row
+   optically level. */
+.btn { min-height: 34px; }
+.btn-sm { min-height: 30px; }
+.btn-xs { min-height: 26px; }
+/* .btn-xs was the one size that rendered in --text2; the family is --text. */
+.btn-xs { color: var(--text); }
+
+/* Removes the grey flash iOS/Android paint over any tapped control, and the
+   300ms double-tap-zoom delay on the ones that are clearly single-tap. */
+.btn, .nav-item, .nav-tab, .stat-card, .mode-option, .upload-strip, .upload-zone,
+.mailbox-row, .theme-toggle, .var-pill, .badge, .mobile-menu-btn, button, a {
+  -webkit-tap-highlight-color: transparent;
+}
+.btn, .nav-item, .nav-tab, .mobile-menu-btn, .theme-toggle, .mode-option { touch-action: manipulation; }
+
+/* ── Tabs ──────────────────────────────────────────────────────────────────
+   The tab strips are now <button>s so they can be reached by keyboard. The
+   browser's own button styling has to be undone for them to look unchanged. */
+button.nav-tab {
+  appearance: none; background: none; border: 0;
+  border-bottom: 2px solid transparent;
+  font: inherit; font-size: 13px; line-height: 1.5;
+  color: var(--text2); cursor: pointer;
+  display: inline-flex; align-items: center;
+}
+.nav-tab:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+
+/* ── Tables ────────────────────────────────────────────────────────────────
+   A table wider than its card scrolls sideways with nothing to say so. These
+   are the classic shadow-cover pairs: the shadow shows only while there is
+   still content past that edge. */
+.table-card {
+  background-image:
+    linear-gradient(to right, var(--bg) 30%, transparent),
+    linear-gradient(to left,  var(--bg) 30%, transparent),
+    linear-gradient(to right, rgba(20,22,34,.10), transparent 12px),
+    linear-gradient(to left,  rgba(20,22,34,.10), transparent 12px);
+  background-position: 0 0, 100% 0, 0 0, 100% 0;
+  background-repeat: no-repeat;
+  background-size: 28px 100%, 28px 100%, 12px 100%, 12px 100%;
+  background-attachment: local, local, scroll, scroll;
+}
+[data-theme="dark"] .table-card {
+  background-image:
+    linear-gradient(to right, var(--bg) 30%, transparent),
+    linear-gradient(to left,  var(--bg) 30%, transparent),
+    linear-gradient(to right, rgba(0,0,0,.45), transparent 12px),
+    linear-gradient(to left,  rgba(0,0,0,.45), transparent 12px);
+}
+
+/* Numbers in a column should line up digit for digit. */
+td.num, th.num, .page-info, .stat-value, .kpi-value, .sh-date, .af-when {
+  font-variant-numeric: tabular-nums;
+}
+
+/* A long address used to stretch the row rather than wrap. */
+.contact-chip > div { min-width: 0; }
+.contact-chip .name, .contact-chip .email {
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 30ch;
+}
+
+/* ── Stat values ───────────────────────────────────────────────────────────
+   Dashboard carried one KPI tinted with a literal hex, which stayed a dark
+   blue on the dark canvas. These are the token-backed versions. */
+.stat-value.blue   { color: var(--blue); }
+.stat-value.indigo { color: var(--indigo); }
+.stat-value.purple { color: var(--purple); }
+
+/* ── Empty states ──────────────────────────────────────────────────────────
+   The icon sat hard against the text with no breathing room. */
+.empty-state i { display: block; margin: 0 auto 10px; }
+.empty-state { line-height: 1.6; }
+
+/* ── Selection bar ─────────────────────────────────────────────────────────
+   The bar is fixed to the bottom edge, so whatever it covered — the last table
+   rows and the pager — was unreachable while a selection was live. Reserving
+   the space only while it is visible keeps the page from jumping otherwise. */
+.section:has(.bulk-bar.visible) { padding-bottom: 88px; }
+/* Dashboard renders the bar as a sibling of its section, not inside it. */
+.main:has(> .bulk-bar.visible) > .section { padding-bottom: 88px; }
+
+.bulk-bar {
+  padding-bottom: calc(14px + env(safe-area-inset-bottom));
+}
+/* `.bulk-bar .btn` recoloured the text to white but left `.btn`'s own
+   background in place, so an unadorned button on the bar was white-on-white in
+   the light theme and invisible. The bar is a dark surface in both themes, so
+   its buttons are ghosts on that surface. */
+.bulk-bar .btn {
+  background: rgba(255,255,255,.10);
+  border-color: rgba(255,255,255,.22);
+  color: #fff;
+}
+.bulk-bar .btn:hover { background: rgba(255,255,255,.18); color: #fff; }
+.bulk-bar .btn:disabled { background: rgba(255,255,255,.06); color: rgba(255,255,255,.5); }
+
+/* On the near-black bar the light theme's --red (#c0392b) and --blue sit at
+   roughly 4:1 against the fill. These are the same hues stepped for a dark
+   surface, so the bar reads the same in both themes. */
+.bulk-bar .btn-del  { color: #ff8a80; border-color: rgba(255,138,128,.45); background: transparent; }
+.bulk-bar .btn-del:hover { background: rgba(255,138,128,.14); }
+.bulk-bar .btn-send { background: var(--accent); border-color: transparent; color: #fff; }
+.bulk-bar .btn-send:hover { filter: brightness(1.08); background: var(--accent); }
+.bulk-bar select {
+  background: rgba(255,255,255,.08); color: #fff; border-color: rgba(255,255,255,.22);
+}
+.bulk-bar select option { color: var(--text); background: var(--bg); }
+
+/* ── Floating furniture ────────────────────────────────────────────────────
+   The send-job widget and the toasts both anchor to the bottom-right, and the
+   selection bar lands on top of both. Each gets out of the other's way.
+   Keyed off <body>, not .app-shell: the toast container is mounted by the
+   provider *outside* the shell, so a shell-scoped :has() would never see it. */
+#send-job-widget { bottom: calc(20px + env(safe-area-inset-bottom)); }
+.toast-container { bottom: calc(20px + env(safe-area-inset-bottom)); }
+body:has(.bulk-bar.visible) #send-job-widget,
+body:has(.bulk-bar.visible) .toast-container {
+  bottom: calc(84px + env(safe-area-inset-bottom));
+}
+/* The Action Center button takes the corner; the widget and toasts stack above it. */
+.ac-wrap { position: fixed; right: 20px; bottom: calc(20px + env(safe-area-inset-bottom)); z-index: 450; }
+body:has(.ac-wrap) #send-job-widget,
+body:has(.ac-wrap) .toast-container { bottom: calc(80px + env(safe-area-inset-bottom)); }
+body:has(.bulk-bar.visible) .ac-wrap { bottom: calc(84px + env(safe-area-inset-bottom)); }
+body:has(.bulk-bar.visible):has(.ac-wrap) #send-job-widget,
+body:has(.bulk-bar.visible):has(.ac-wrap) .toast-container { bottom: calc(144px + env(safe-area-inset-bottom)); }
+
+/* ── Action Center ─────────────────────────────────────────────────────────
+   A speed dial: the ⚡ button fans out a stack of compact chips above itself.
+   Each chip is one action; hovering (or focusing) it shows a detail card. */
+.ac-btn {
+  position: relative; width: 52px; height: 52px; border-radius: 50%; cursor: pointer;
+  border: 1px solid rgba(255,255,255,.18);
+  background: var(--accent-grad, var(--accent)); color: #fff; font-size: 24px;
+  box-shadow: 0 10px 26px -6px var(--accent-glow, rgba(99,102,241,.55)), inset 0 1px 0 rgba(255,255,255,.28);
+  display: inline-flex; align-items: center; justify-content: center;
+  transition: transform .18s var(--ease), filter .15s var(--ease), box-shadow .18s var(--ease);
+}
+.ac-btn i { filter: drop-shadow(0 1px 1px rgba(0,0,0,.25)); }
+.ac-btn:hover {
+  filter: brightness(1.07); transform: translateY(-2px);
+  box-shadow: 0 14px 30px -6px var(--accent-glow, rgba(99,102,241,.6)), inset 0 1px 0 rgba(255,255,255,.28);
+}
+.ac-btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
+.ac-btn[aria-expanded="true"] { transform: rotate(90deg); }
+.ac-btn .notif-badge {
+  top: -3px; right: -3px; min-width: 19px; height: 19px; font-size: 10.5px;
+  background: var(--red, #ef4444); box-shadow: 0 0 0 2.5px var(--canvas, var(--bg));
+}
+/* Something to do: a soft ring, three times, then still. */
+.ac-btn.has-due::after {
+  content: ''; position: absolute; inset: -1px; border-radius: 50%;
+  border: 2px solid var(--accent); opacity: 0; pointer-events: none;
+  animation: ac-ring 2.4s var(--ease) 0.6s 3;
+}
+@keyframes ac-ring { 0% { transform: scale(1); opacity: .55; } 100% { transform: scale(1.55); opacity: 0; } }
+
+/* Hover label: what the button is, and how much is waiting. */
+.ac-btn-label {
+  position: absolute; right: calc(100% + 10px); top: 50%; transform: translate(6px, -50%);
+  white-space: nowrap; pointer-events: none; opacity: 0;
+  padding: 6px 11px; border-radius: 999px; font-size: 12.5px; font-weight: 600;
+  background: var(--bg2); color: var(--text); border: 1px solid var(--border-md, var(--border));
+  box-shadow: var(--shadow-lg); transition: opacity .15s var(--ease), transform .15s var(--ease);
+}
+.ac-btn-label em { font-style: normal; color: var(--text2); font-weight: 500; }
+.ac-wrap:hover .ac-btn-label { opacity: 1; transform: translate(0, -50%); }
+@media (hover: none) { .ac-btn-label { display: none; } }
+
+/* Room under the last row of any page, so the button never sits on its controls. */
+body:has(.ac-wrap) #main { padding-bottom: 84px; }
+
+.ac-dial {
+  position: absolute; right: 0; bottom: calc(100% + 12px);
+  display: flex; flex-direction: column; align-items: flex-end; gap: 10px;
+  max-height: min(640px, calc(100vh - 120px)); overflow-y: auto; overscroll-behavior: contain;
+  padding: 4px 2px 2px 24px; scrollbar-width: none;
+}
+.ac-dial::-webkit-scrollbar { width: 0; height: 0; }
+.ac-group-stack { display: flex; flex-direction: column; align-items: flex-end; gap: 6px; }
+.ac-group {
+  font-size: 10.5px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase;
+  color: var(--text3); padding: 0 6px; text-shadow: 0 0 6px var(--canvas, var(--bg));
+}
+
+.ac-chip {
+  display: inline-flex; align-items: center; gap: 8px; height: 36px; padding: 0 12px 0 11px;
+  border-radius: 999px; border: 1px solid var(--border-md, var(--border));
+  background: var(--bg2); color: var(--text); font: inherit; font-size: 13px; font-weight: 600;
+  box-shadow: var(--shadow-lg); cursor: pointer; white-space: nowrap;
+  animation: ac-pop .18s var(--ease) both;
+  transition: transform .12s var(--ease), border-color .12s var(--ease), background-color .12s var(--ease);
+}
+.ac-chip i { font-size: 17px; color: var(--accent); }
+.ac-chip:hover, .ac-chip:focus-visible { transform: translateX(-3px); border-color: var(--accent); outline: none; }
+.ac-chip.tone-warning i { color: var(--amber); }
+.ac-chip.tone-error i { color: var(--red, #ef4444); }
+.ac-chip.tone-success i { color: var(--green, #22c55e); }
+.ac-chip.is-disabled { cursor: default; color: var(--text3); background: var(--bg); box-shadow: none; }
+.ac-chip.is-disabled i { color: var(--text3); }
+.ac-chip.is-disabled:hover { transform: none; border-color: var(--border-md, var(--border)); }
+.ac-chip:disabled { opacity: .55; cursor: wait; }
+.ac-chip-muted { cursor: default; color: var(--text2); font-weight: 500; }
+.ac-chip-muted i { color: var(--green, #22c55e); }
+.ac-chip-count {
+  min-width: 22px; height: 20px; padding: 0 6px; border-radius: 10px;
+  background: var(--accent-bg); color: var(--accent); font-size: 11.5px; font-weight: 700;
+  display: inline-flex; align-items: center; justify-content: center;
+}
+.ac-chip.tone-error .ac-chip-count { background: var(--red-bg, rgba(239,68,68,.14)); color: var(--red, #ef4444); }
+.ac-chip.tone-warning .ac-chip-count { background: var(--amber-bg); color: var(--amber); }
+@keyframes ac-pop { from { opacity: 0; transform: translateY(8px) scale(.96); } to { opacity: 1; transform: none; } }
+
+/* While open, the page dims behind the dial so the chips read cleanly. */
+.ac-scrim {
+  position: fixed; inset: 0; z-index: 445;
+  background: color-mix(in srgb, var(--canvas, #000) 55%, transparent);
+  backdrop-filter: blur(3px); -webkit-backdrop-filter: blur(3px);
+  animation: ac-fade .15s var(--ease) both;
+}
+/* The send widget shares the corner and stacks higher: step aside while the dial is open. */
+body:has(.ac-scrim) #send-job-widget { visibility: hidden; }
+.ac-group { text-shadow: none; }
+.ac-chip-lock { font-size: 13px !important; color: var(--text3) !important; margin-left: -2px; }
+
+/* Run: a single row of round icon buttons. */
+.ac-run-row { display: flex; gap: 8px; animation: ac-pop .18s var(--ease) both; }
+.ac-icon-btn {
+  position: relative; width: 40px; height: 40px; border-radius: 50%;
+  display: inline-flex; align-items: center; justify-content: center;
+  border: 1px solid var(--border-md, var(--border)); background: var(--bg2); color: var(--accent);
+  font-size: 18px; cursor: pointer; box-shadow: var(--shadow-lg);
+  transition: transform .12s var(--ease), border-color .12s var(--ease);
+}
+.ac-icon-btn:hover, .ac-icon-btn:focus-visible { transform: translateY(-2px); border-color: var(--accent); outline: none; }
+.ac-icon-btn.is-disabled { color: var(--text3); background: var(--bg); box-shadow: none; cursor: default; }
+.ac-icon-btn.is-disabled:hover { transform: none; border-color: var(--border-md, var(--border)); }
+.ac-icon-btn:disabled { opacity: .55; cursor: wait; }
+.ac-lock-dot {
+  position: absolute; right: -3px; bottom: -3px; width: 17px; height: 17px; border-radius: 50%;
+  display: inline-flex; align-items: center; justify-content: center; font-size: 10.5px;
+  background: var(--bg2); border: 1px solid var(--border-md, var(--border)); color: var(--amber);
+}
+.ac-icon-count {
+  position: absolute; top: -5px; right: -5px; min-width: 18px; height: 18px; padding: 0 4px; border-radius: 9px;
+  background: var(--accent); color: #fff; font-size: 10px; font-weight: 700;
+  display: inline-flex; align-items: center; justify-content: center;
+}
+
+/* The detail card, beside whichever chip is hovered. Fixed, so the dial's scroll never clips it. */
+.ac-tip {
+  position: fixed; z-index: 460; transform: translateY(-50%); pointer-events: none;
+  width: min(280px, calc(100vw - 120px)); padding: 10px 12px;
+  background: var(--bg2); border: 1px solid var(--border-md, var(--border));
+  border-radius: 12px; box-shadow: var(--shadow-lg); animation: ac-fade .12s var(--ease) both;
+}
+.ac-tip-title { font-size: 13px; font-weight: 600; line-height: 1.35; color: var(--text); }
+.ac-tip-body { margin-top: 4px; font-size: 12.5px; line-height: 1.4; color: var(--text2); }
+.ac-tip-warn { margin-top: 6px; font-size: 12px; color: var(--amber); display: flex; gap: 5px; align-items: center; }
+.ac-tip-cta { margin-top: 6px; font-size: 11.5px; color: var(--accent); font-weight: 600; }
+@keyframes ac-fade { from { opacity: 0; } to { opacity: 1; } }
+
+.ac-spin { animation: ac-spin 1s linear infinite; }
+@keyframes ac-spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) {
+  .ac-spin, .ac-chip, .ac-tip, .ac-scrim, .ac-run-row, .ac-btn.has-due::after { animation: none; }
+  .ac-btn, .ac-chip, .ac-icon-btn, .ac-btn-label { transition: none; }
+}
+/* Touch screens have no hover: tapping runs the action, so the card is skipped. */
+@media (hover: none) { .ac-tip { display: none; } }
+@media (max-width: 700px) {
+  .ac-wrap { right: 14px; }
+  .ac-btn { width: 46px; height: 46px; font-size: 21px; }
+  .ac-chip { height: 34px; font-size: 12.5px; }
+}
+
+/* ── Sidebar ───────────────────────────────────────────────────────────────
+   Off-canvas on a phone it runs edge to edge, including under the notch and
+   the home indicator. */
+.sidebar {
+  padding-top: calc(18px + env(safe-area-inset-top));
+  padding-bottom: calc(20px + env(safe-area-inset-bottom));
+  overscroll-behavior: contain;
+}
+/* Aurora drops the active bar for a filled pill; the base sheet's ::before
+   still paints a stub outside the pill on the group's children. */
+.nav-children .nav-item.active::before { display: none; }
+
+/* ── Main scroll ───────────────────────────────────────────────────────────
+   Stops an over-scroll at the end of a long table from rubber-banding the
+   whole page on iOS. */
+.main { overscroll-behavior-y: contain; }
+
+/* ── Mailbox ───────────────────────────────────────────────────────────────
+   The selected thread was marked by fill alone, which the unread rows also
+   use. A rail on the active row separates the two meanings. */
+.mailbox-row { position: relative; transition: background-color .12s var(--ease); }
+.mailbox-row.active::before {
+  content: ''; position: absolute; left: 0; top: 0; bottom: 0; width: 3px;
+  background: var(--accent);
+}
+.mailbox-list, .mailbox-thread { overscroll-behavior: contain; }
+
+/* ── Modals ────────────────────────────────────────────────────────────────
+   A tall modal scrolls inside itself; without this the heading scrolls away
+   and there is no visible edge where the content is cut. */
+.edit-modal, .mode-picker { overscroll-behavior: contain; }
+
+/* ── Upload strip ──────────────────────────────────────────────────────────
+   It is a click target, so it needs the same focus ring as a button. */
+.upload-strip:focus-visible, .upload-zone:focus-visible {
+  outline: 2px solid var(--accent); outline-offset: 2px;
+}
+/* The "Browse" button inside the strip is decoration — the whole strip is the
+   control — so it must not look interactive on its own. */
+.upload-strip .btn[style*="pointer-events"] { box-shadow: none; }
+
+/* ── Toasts ────────────────────────────────────────────────────────────────
+   Three toasts in a row all looked alike at a glance; the type colour was only
+   on the icon. A hairline down the leading edge carries it to the whole card. */
+.toast { border-left: 3px solid var(--border-md); }
+.toast.success { border-left-color: var(--green); }
+.toast.error   { border-left-color: var(--red); }
+.toast.info    { border-left-color: var(--blue); }
+
+/* ── Motion ────────────────────────────────────────────────────────────────
+   The reduced-motion block in the base sheet zeroes durations, which would
+   leave a spinner frozen mid-rotation and reading as a stuck UI. Hiding the
+   rotation entirely is the honest version. */
+@media (prefers-reduced-motion: reduce) {
+  .ti-loader, .ti-loader-2, .ti-loader-3 { animation: none; opacity: .6; }
+  .btn:hover, .stat-card:hover { transform: none; }
+}
+
+/* ══════════════════════════════════════════════════════════════════════════
+   MOBILE
+   ══════════════════════════════════════════════════════════════════════════ */
+
+/* ── Filter rows ───────────────────────────────────────────────────────────
+   Search plus four dropdowns, each with a 140–150px floor, stacks into five
+   full-width rows on a phone — the table is then two screens down. Two up, and
+   the search keeps its own line because it is the one people actually type in. */
+@media (max-width: 700px) {
+  .filter-row { gap: 8px; }
+  .filter-row > input[type=text],
+  .filter-row > input[type=search] { flex: 1 1 100% !important; max-width: none !important; }
+  .filter-row > select {
+    flex: 1 1 calc(50% - 4px) !important;
+    min-width: 0 !important; width: auto !important;
+  }
+  .filter-row > button,
+  .filter-row > div { flex: 1 1 calc(50% - 4px); min-width: 0; }
+  .filter-row > div > button { width: 100%; justify-content: center; }
+}
+
+@media (max-width: 700px) {
+  /* The iOS zoom-on-focus floor missed the date and time fields, which is where
+     it is most disruptive — the picker opens on a zoomed page. */
+  input[type=date], input[type=time], input[type=month] { font-size: 16px !important; }
+
+  /* Comfortable targets for the icon-only buttons that sit in table rows. */
+  .btn { min-height: 38px; }
+  .btn-sm { min-height: 36px; }
+  .btn-xs { min-height: 32px; }
+  td .btn-sm, td .btn-xs { min-width: 36px; justify-content: center; }
+
+  /* A wrapped selection bar is two or three rows tall, so it hides more of the
+     page than the desktop reserve allows for. */
+  .section:has(.bulk-bar.visible),
+  .main:has(> .bulk-bar.visible) > .section { padding-bottom: 132px; }
+  body:has(.bulk-bar.visible) #send-job-widget,
+  body:has(.bulk-bar.visible) .toast-container {
+    bottom: calc(128px + env(safe-area-inset-bottom));
+  }
+
+  /* Quick-select strips ("First 50 / 100 / 200…") are a row of equal chips;
+     letting them share the width beats a ragged two-and-a-bit-per-line wrap. */
+  .quick-select { gap: 6px; }
+  .quick-select .btn { flex: 1 1 auto; justify-content: center; }
+
+  /* Topbar buttons stretch to share the row; a lone one stretching full width
+     looks like a banner rather than a button. */
+  .topbar-actions > *:only-child { flex: 0 1 auto; }
+
+  /* Fixed furniture clears the home indicator. */
+  #send-job-widget { bottom: calc(12px + env(safe-area-inset-bottom)); }
+  .toast-container { bottom: calc(12px + env(safe-area-inset-bottom)); }
+  .bulk-bar { padding-bottom: calc(10px + env(safe-area-inset-bottom)); }
+
+  /* The pager is the one control people hit repeatedly on a phone. */
+  .pagination-bar { padding: 16px 0 6px; }
+  .pagination-bar .btn { min-height: 40px; }
+}
+
+@media (max-width: 480px) {
+  /* Below this the two-up dropdowns are narrower than their own labels. */
+  .filter-row > select { flex: 1 1 100% !important; }
+}
+
+/* ── Landscape phone ───────────────────────────────────────────────────────
+   A 380px-tall viewport cannot spare 200px of KPI tiles above the table. */
+@media (max-height: 460px) and (max-width: 900px) {
+  .stat-grid { padding: 10px 14px 0; gap: 8px; }
+  .stat-card { padding: 10px 12px; }
+  .stat-value, .kpi-value { font-size: 19px; }
+  .kpi-ico { display: none; }
+  .topbar { padding: 8px 14px; }
+}
+
+/* ── Layout plumbing ───────────────────────────────────────────────────────
+   The page content now sits in a real <main> inside the scroll column, so that
+   element has to carry the growth the section used to get directly. Without
+   this a short page stops filling the viewport and the wizard's footer, which
+   is pushed down by margin-top:auto, rides up under the content. */
+.main > main {
+  flex: 1; display: flex; flex-direction: column; min-height: 0;
+}
+
+/* ── Theme toggle ──────────────────────────────────────────────────────────
+   The control now names the mode it is in rather than pointing at a submenu
+   that does not exist. */
+.theme-toggle .tt-state {
+  font-size: 11px; font-weight: 600; letter-spacing: .02em;
+  color: var(--text3); text-transform: uppercase;
+}
+.theme-toggle:hover .tt-state { color: var(--text2); }
+
+/* ── Boot screen ───────────────────────────────────────────────────────────
+   Shown only while the session request is in flight. */
+.boot-screen {
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  gap: 14px; height: 100vh; height: 100dvh;
+  background: var(--canvas); color: var(--text2); font-size: 13px;
+  animation: bootIn .5s var(--ease) .15s both;     /* a flash on a fast load is worse than nothing */
+}
+.boot-screen .sidebar-logo-icon { width: 44px; height: 44px; font-size: 21px; }
+@keyframes bootIn { from { opacity: 0; } to { opacity: 1; } }
+
+/* ── Action cells ──────────────────────────────────────────────────────────
+   These cells were `display: flex`, which takes the element out of the table's
+   cell model: it stops contributing to column width and no longer aligns with
+   the rest of the row. Inline children plus a gutter give the same look while
+   the cell stays a cell. */
+td.cell-actions { white-space: nowrap; }
+td.cell-actions > * { vertical-align: middle; }
+td.cell-actions > * + * { margin-left: 4px; }
+.kpi-ico.indigo { background: var(--indigo-bg); color: var(--indigo); }
+.kpi-ico.blue   { background: var(--blue-bg);   color: var(--blue); }
+.kpi-ico.purple { background: var(--purple-bg); color: var(--purple); }
+
+/* ── Destructive actions ───────────────────────────────────────────────────
+   Nine screens repeated the same inline pair for a delete button:
+   `color: var(--red); border-color: var(--red-bg)`. The second half painted
+   the border with the *fill* token — a near-invisible tint — so the control
+   read as an ordinary button that happened to have red text. One class, a
+   border in the red hue itself, and a fill that only appears on hover, which
+   is where a destructive action should announce itself. */
+.btn-danger-ghost {
+  color: var(--red);
+  border-color: color-mix(in srgb, var(--red) 32%, transparent);
+  background: var(--bg);
+}
+.btn-danger-ghost:hover {
+  background: var(--red-bg);
+  border-color: color-mix(in srgb, var(--red) 48%, transparent);
+  color: var(--red);
+}
+.btn-danger-ghost:focus-visible { outline-color: var(--red); }
+
+/* ── Error boxes ───────────────────────────────────────────────────────────
+   `.info-box` is blue by definition; the error cases overrode only the border
+   and text, leaving red type on a blue fill. This makes the whole box red. */
+.info-box.danger {
+  background: var(--red-bg);
+  border-color: color-mix(in srgb, var(--red) 30%, transparent);
+  color: var(--red);
+}
+.info-box.danger i { color: var(--red); }
+
+/* ── Mobile, second pass ───────────────────────────────────────────────────
+   Corrections from rendering the real pages at 390px. */
+@media (max-width: 700px) {
+  /* The count badge was sharing the row with the tab strip, so the strip lost
+     a third of its width to it and the tabs scrolled underneath. The badge
+     takes its own line above; the strip keeps its full width and its rule. */
+  .section-head { flex-wrap: wrap; }
+  .section-head .contact-count-badge { order: -1; margin-left: auto; }
+  .section-head .nav-tabs { flex: 1 1 100%; }
+
+  /* The upload strip had its description pushed below the icon AND the button,
+     which read as "icon, Browse, then some text". Icon and description stay
+     together; the button takes the second line. */
+  .upload-strip { flex-wrap: wrap; row-gap: 10px; }
+  .upload-strip .us-icon { order: 0; }
+  .upload-strip .us-text { order: 1; flex: 1 1 0 !important; min-width: 0; }
+  .upload-strip .btn { order: 2; flex: 1 1 100%; justify-content: center; }
+}
+
+/* ── Upload zones ──────────────────────────────────────────────────────────
+   Most .upload-zone blocks are drop targets with their own "Browse" button —
+   clicking the zone itself does nothing, so the pointer cursor was promising
+   something that never happened. The ones that really are click targets carry
+   role="button" and keep the cursor. */
+.upload-zone:not([role="button"]) { cursor: default; }
+.upload-zone:not([role="button"]) .btn { cursor: pointer; }
+
+/* ── Drawer backdrop ───────────────────────────────────────────────────────
+   The base sheet fades it with opacity but flips `display` at the same time,
+   and display is not animatable — so the transition never ran and the sheet
+   appeared instantly. Visibility can be animated alongside opacity. */
+@media (max-width: 700px) {
+  .sidebar-backdrop {
+    display: block; visibility: hidden; opacity: 0;
+    transition: opacity .22s var(--ease), visibility .22s var(--ease);
+  }
+  .sidebar-backdrop.open { visibility: visible; opacity: 1; }
+}
+
+/* ── Refresh loaders ───────────────────────────────────────────────────────
+   components/RefreshBar.tsx. A list that is re-fetching after a filter, sort,
+   tab or page change keeps its rows on screen, dimmed, under a thin sweep —
+   rather than blanking to a spinner (jarring) or sitting stale with no sign
+   anything is happening (reads as broken). */
+.refresh-bar {
+  height: 2px;
+  overflow: hidden;
+  border-radius: 2px;
+  background: transparent;
+  transition: background .15s var(--ease);
+}
+.refresh-bar.on { background: var(--border); }
+.refresh-bar-fill {
+  height: 100%;
+  width: 35%;
+  border-radius: 2px;
+  background: var(--accent);
+  opacity: 0;
+  transform: translateX(-100%);
+}
+.refresh-bar.on .refresh-bar-fill {
+  opacity: 1;
+  animation: refresh-sweep 1.1s var(--ease) infinite;
+}
+@keyframes refresh-sweep {
+  from { transform: translateX(-100%); }
+  to   { transform: translateX(300%); }
+}
+.refreshing-wrap { transition: opacity .15s var(--ease); }
+.refreshing-wrap.is-refreshing { opacity: .55; }
+.refreshing-wrap.is-refreshing,
+.refreshing-wrap.is-refreshing * { cursor: progress; }
+@media (prefers-reduced-motion: reduce) {
+  /* No sweep — a solid bar still says "working" without moving. */
+  .refresh-bar.on .refresh-bar-fill { animation: none; width: 100%; transform: none; opacity: .6; }
+}
+
+/* ── Topbar tools: notification bell + signed-in user ─────────────────────── */
+.topbar-left { flex: 1 1 auto; }
+.topbar-tools { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
+
+.notif-wrap, .usermenu-wrap { position: relative; }
+.notif-btn, .usermenu-btn {
+  display: inline-flex; align-items: center; gap: 8px; position: relative;
+  background: var(--bg2); border: 1px solid var(--border); color: var(--text2);
+  border-radius: 10px; cursor: pointer; font-family: inherit;
+  transition: background-color .15s var(--ease), color .15s var(--ease), border-color .15s var(--ease);
+}
+.notif-btn:hover, .usermenu-btn:hover { background: var(--bg3, var(--bg2)); color: var(--text); border-color: var(--border-md); }
+.notif-btn { width: 38px; height: 38px; justify-content: center; font-size: 18px; }
+.notif-badge {
+  position: absolute; top: -6px; right: -6px; min-width: 18px; height: 18px; padding: 0 5px;
+  border-radius: 9px; background: var(--accent); color: #fff; font-size: 10.5px; font-weight: 700;
+  display: inline-flex; align-items: center; justify-content: center; line-height: 1;
+  box-shadow: 0 0 0 2px var(--canvas);
+}
+.notif-badge.error { background: var(--red, #ef4444); }
+
+.notif-panel, .usermenu-panel {
+  position: absolute; top: calc(100% + 8px); right: 0; z-index: 400;
+  background: var(--bg2); border: 1px solid var(--border-md, var(--border));
+  border-radius: var(--radius-xl, 14px); box-shadow: var(--shadow-lg);
+}
+.notif-panel { width: min(400px, calc(100vw - 24px)); display: flex; flex-direction: column; max-height: min(520px, 75vh); }
+.notif-head { display: flex; align-items: center; justify-content: space-between; padding: 12px 14px; border-bottom: 1px solid var(--border); font-size: 13.5px; }
+.notif-markall { background: none; border: 0; color: var(--accent); font: inherit; font-size: 12.5px; font-weight: 600; cursor: pointer; padding: 2px 4px; }
+.notif-markall:disabled { color: var(--text3); cursor: default; }
+.notif-head-actions { display: flex; gap: 10px; }
+.notif-row { position: relative; }
+.notif-row .notif-item { padding-right: 34px; }
+.notif-row .notif-dot { position: absolute; right: 14px; top: 16px; margin: 0; }
+/* The ✕ takes the dot's place on hover / keyboard focus. */
+.notif-clear {
+  position: absolute; top: 8px; right: 6px; width: 26px; height: 26px; border-radius: 7px;
+  display: inline-flex; align-items: center; justify-content: center; font-size: 14px;
+  background: var(--bg2); border: 1px solid var(--border); color: var(--text2); cursor: pointer;
+  opacity: 0; transition: opacity .12s var(--ease);
+}
+.notif-row:hover .notif-clear, .notif-clear:focus-visible { opacity: 1; }
+.notif-row:hover .notif-dot { opacity: 0; }
+.notif-clear:hover { color: var(--text); border-color: var(--border-md); }
+/* No hover on touch screens: keep the ✕ visible there. */
+@media (hover: none) { .notif-clear { opacity: 1; } .notif-row .notif-dot { right: 40px; } }
+.notif-list { list-style: none; margin: 0; padding: 4px; overflow-y: auto; }
+.notif-item {
+  display: flex; align-items: flex-start; gap: 11px; width: 100%; text-align: left;
+  padding: 10px; border: 0; background: none; border-radius: 10px; cursor: pointer; font: inherit; color: var(--text);
+}
+.notif-item:hover { background: var(--bg3, var(--rail-hover)); }
+.notif-item.unread { background: color-mix(in srgb, var(--accent) 7%, transparent); }
+.notif-icon {
+  flex-shrink: 0; width: 30px; height: 30px; border-radius: 50%; font-size: 16px;
+  display: inline-flex; align-items: center; justify-content: center;
+}
+.notif-icon.success { background: var(--green-bg, rgba(34,197,94,.14)); color: var(--green, #22c55e); }
+.notif-icon.info    { background: var(--accent-bg); color: var(--accent); }
+.notif-icon.warning { background: var(--amber-bg); color: var(--amber); }
+.notif-icon.error   { background: var(--red-bg, rgba(239,68,68,.14)); color: var(--red, #ef4444); }
+.notif-text { display: flex; flex-direction: column; gap: 2px; min-width: 0; flex: 1; }
+.notif-title { font-size: 13px; font-weight: 600; line-height: 1.35; }
+.notif-body { font-size: 12.5px; color: var(--text2); line-height: 1.4; overflow-wrap: anywhere; }
+.notif-time { font-size: 11.5px; color: var(--text3); }
+.notif-dot { flex-shrink: 0; width: 8px; height: 8px; border-radius: 50%; background: var(--accent); margin-top: 6px; }
+.notif-empty { display: flex; flex-direction: column; align-items: center; gap: 4px; text-align: center; padding: 34px 24px; color: var(--text2); font-size: 13px; }
+.notif-empty i { font-size: 30px; color: var(--text3); margin-bottom: 4px; }
+.notif-empty span { font-size: 12px; color: var(--text3); }
+
+.usermenu-btn { padding: 3px 10px 3px 3px; height: 38px; font-size: 13px; font-weight: 600; color: var(--text); }
+.usermenu-btn .avatar { width: 30px; height: 30px; font-size: 12px; }
+.usermenu-name { max-width: 150px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.usermenu-caret { font-size: 12px; opacity: .6; }
+.usermenu-panel { min-width: 220px; padding: 6px; }
+.usermenu-id { display: flex; flex-direction: column; gap: 2px; padding: 8px 10px 10px; border-bottom: 1px solid var(--border); margin-bottom: 4px; font-size: 13px; }
+.usermenu-id span { color: var(--text3); font-size: 12px; overflow-wrap: anywhere; }
+.usermenu-panel > button {
+  display: flex; align-items: center; gap: 9px; width: 100%; padding: 8px 10px; border: 0; background: none;
+  border-radius: 8px; font: inherit; font-size: 13px; color: var(--text2); cursor: pointer; text-align: left;
+}
+.usermenu-panel > button:hover { background: var(--bg3, var(--rail-hover)); color: var(--text); }
+
+/* Sign out now lives alone in the rail's footer. */
+.sidebar-signout {
+  display: flex; align-items: center; gap: 6px; font-size: 12px; font-family: inherit;
+  color: var(--rail-fg-dim, var(--text2)); background: none; border: none; cursor: pointer; padding: 8px 0 0; margin-top: 4px;
+}
+.sidebar-signout:hover { color: var(--text); }
+
+/* Collapse toggle in the logo row. Hidden on a phone, where the drawer is always full. */
+.sidebar-collapse-btn {
+  display: none; margin-left: auto; width: 28px; height: 28px; border-radius: 8px;
+  align-items: center; justify-content: center; font-size: 17px; cursor: pointer;
+  background: none; border: 0; color: var(--rail-fg-dim, var(--text2));
+}
+.sidebar-collapse-btn:hover { background: var(--rail-hover); color: var(--text); }
+
+@media (min-width: 701px) {
+  .sidebar { transition: width .2s var(--ease); }
+  .sidebar-collapse-btn { display: inline-flex; }
+
+  /* 64px icon rail. Labels go; icons, badges (as dots) and tooltips (native title) stay. */
+  .sidebar-collapsed .sidebar { width: 68px; overflow-x: hidden; }
+  .sidebar-collapsed .sidebar-logo { padding: 2px 0 14px; margin: 0 8px 12px; flex-direction: column; justify-content: center; gap: 10px; }
+  .sidebar-collapsed .sidebar-logo-text,
+  .sidebar-collapsed .nav-label,
+  .sidebar-collapsed .nav-section-label,
+  .sidebar-collapsed .nav-tip,
+  .sidebar-collapsed .nav-caret,
+  .sidebar-collapsed .tt-state { display: none; }
+  .sidebar-collapsed .sidebar-collapse-btn { margin-left: 0; }
+  .sidebar-collapsed .nav-item { justify-content: center; margin: 3px 10px; padding: 10px 0; gap: 0; }
+  .sidebar-collapsed .nav-item.nav-group { width: calc(100% - 20px); }
+  /* The group's children are always shown so every page stays one click away. */
+  .sidebar-collapsed .nav-children { margin-left: 0; padding-left: 0; border-left: 0; }
+  .sidebar-collapsed .nav-children .nav-item { margin: 3px 10px; }
+  .sidebar-collapsed .nav-children[hidden] { display: block !important; }
+  .sidebar-collapsed .nav-item .tab-badge {
+    position: absolute; top: 4px; right: 8px; min-width: 8px; width: 8px; height: 8px; padding: 0;
+    font-size: 0; border-radius: 50%; margin: 0;
+  }
+  .sidebar-collapsed .sidebar-bottom { padding: 14px 0 0; margin: 10px 8px 0; }
+  .sidebar-collapsed .theme-toggle { justify-content: center; padding: 9px 0; }
+  .sidebar-collapsed .sidebar-signout { justify-content: center; width: 100%; }
+}
+
+/* Phone: tools sit beside the title; actions wrap to their own row beneath. */
+@media (max-width: 700px) {
+  .topbar-left { flex: 1 1 0; }
+  .topbar-tools { order: 2; }
+  .topbar-actions { order: 3; }
+  .usermenu-name, .usermenu-caret { display: none; }
+  /* The bell is not at the screen edge on a phone (the avatar is), so a panel anchored
+     to it ran off the left side. Pin it to the viewport instead. */
+  .notif-panel { position: fixed; top: 64px; left: 12px; right: 12px; width: auto; }
+  .usermenu-btn { padding: 3px; }
+}
+
+/* ── Admin: one account's drawer (AdminUserDrawer.tsx) ─────────────────────── */
+.user-drawer-wrap {
+  position: fixed; inset: 0; z-index: 350; display: flex; justify-content: flex-end; /* above the sidebar (300), below modals (400) */
+  background: color-mix(in srgb, #06070b 45%, transparent); backdrop-filter: blur(3px);
+}
+.user-drawer {
+  width: min(460px, 100vw); height: 100%; overflow-y: auto; background: var(--bg);
+  border-left: 1px solid var(--border); box-shadow: var(--shadow-lg); padding: 20px 18px 28px;
+  animation: user-drawer-in .18s ease-out;
+}
+@keyframes user-drawer-in { from { transform: translateX(24px); opacity: 0; } to { transform: none; opacity: 1; } }
+.user-drawer h3 { font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: .04em; color: var(--text3); margin: 20px 0 8px; }
+.user-drawer .ud-stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+.user-drawer .ud-stat { background: var(--bg2); border-radius: var(--radius); padding: 8px 10px; }
+.user-drawer .ud-stat b { display: block; font-size: 17px; font-variant-numeric: tabular-nums; }
+.user-drawer .ud-stat span { font-size: 11px; color: var(--text2); }
+.user-drawer .ud-action { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 9px 0; border-bottom: 1px solid var(--border); }
+.user-drawer .ud-action:last-child { border-bottom: 0; }
+.user-drawer .ud-action-text { min-width: 0; font-size: 12.5px; }
+.user-drawer .ud-action-text div:last-child { font-size: 11.5px; color: var(--text3); margin-top: 1px; }
+.tr-clickable { cursor: pointer; }
+.tr-clickable:hover td { background: var(--bg2); }
+@media (prefers-reduced-motion: reduce) { .user-drawer { animation: none; } }
+
+/* Job platforms: one collapsed chip, then one split pill per platform
+   (■ Name │ Find jobs │ Apply N). Only runnable segments are shown. */
+.ac-chip .ac-chev { font-size: 13px !important; color: var(--text3) !important; transition: transform .15s var(--ease); }
+.ac-chip[aria-expanded="true"] { border-color: var(--accent); }
+.ac-chip[aria-expanded="true"] .ac-chev { transform: rotate(180deg); }
+.ac-split {
+  display: inline-flex; align-items: stretch; height: 34px; border-radius: 999px; overflow: hidden;
+  border: 1px solid var(--border-md, var(--border)); background: var(--bg2); box-shadow: var(--shadow-lg);
+  font-size: 12.5px; font-weight: 600; animation: ac-pop .18s var(--ease) both; white-space: nowrap;
+}
+.ac-split-name { display: inline-flex; align-items: center; gap: 7px; padding: 0 11px 0 12px; color: var(--text); }
+.ac-split-name .pdot { width: 8px; height: 8px; border-radius: 2px; }
+.ac-seg {
+  display: inline-flex; align-items: center; gap: 6px; padding: 0 12px; border: none; border-left: 1px solid var(--border-md, var(--border));
+  background: transparent; color: var(--accent); font: inherit; cursor: pointer;
+}
+.ac-seg i { font-size: 15px; }
+.ac-seg:hover, .ac-seg:focus-visible { background: var(--accent-bg); outline: none; }
+.ac-seg:disabled { opacity: .55; cursor: wait; }
+.ac-seg.is-note { color: var(--text3); cursor: default; font-weight: 500; }
+.ac-seg.is-note:hover { background: transparent; }
+.ac-seg .ac-chip-count { height: 18px; min-width: 18px; font-size: 11px; }
+@media (prefers-reduced-motion: reduce) { .ac-split { animation: none; } }
