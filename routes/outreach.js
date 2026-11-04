@@ -12,6 +12,7 @@ const Lead = require('../models/Lead');
 const Profile = require('../models/Profile');
 const Settings = require('../models/Settings');
 const { renderStep, whyBlocked, variablesIn, VARIABLES, STARTER } = require('../lib/outreach/render');
+const { enroll, stop, forLead } = require('../lib/outreach/enroll');
 
 const router = express.Router();
 const validId = (id) => mongoose.isValidObjectId(id);
@@ -162,6 +163,42 @@ router.post('/sequences/preview', async (req, res) => {
       return out.ok ? { ok: true, subject: i > 0 ? null : out.subject, body: out.body } : { ok: false, why: whyBlocked(out) };
     });
     res.json({ lead: lead ? { id: String(lead._id), name: lead.name, person: lead.person } : null, steps });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ── Enrolment ───────────────────────────────────────────────────────────────
+
+/** Add leads to a sequence. Each one that can't go in comes back with the reason. */
+router.post('/enroll', async (req, res) => {
+  const { leadIds, sequenceId } = req.body || {};
+  const ids = (Array.isArray(leadIds) ? leadIds : []).filter(validId).slice(0, 200);
+  if (!ids.length || !validId(sequenceId)) return res.status(400).json({ error: 'Pick leads and a sequence.' });
+  try {
+    const r = await enroll(req.userId, ids, sequenceId);
+    if (r.error) return res.status(404).json({ error: r.error });
+    res.json(r);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+router.post('/stop', async (req, res) => {
+  const ids = (Array.isArray(req.body && req.body.leadIds) ? req.body.leadIds : []).filter(validId).slice(0, 200);
+  if (!ids.length) return res.status(400).json({ error: 'Pick leads to stop.' });
+  try {
+    res.json({ ok: true, stopped: await stop(req.userId, ids, 'manual') });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+/** One lead's sequence, for the drawer. */
+router.get('/lead/:leadId', async (req, res) => {
+  if (!validId(req.params.leadId)) return res.status(404).json({ error: 'No such lead' });
+  try {
+    res.json({ enrollment: await forLead(req.userId, req.params.leadId) });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }

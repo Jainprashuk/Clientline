@@ -10,6 +10,8 @@ const mongoose = require('mongoose');
 const Lead = require('../models/Lead');
 const { WEAK } = require('../lib/leads/score');
 const { writeOpener } = require('../lib/leads/opener');
+const Enrollment = require('../models/Enrollment');
+const Sequence = require('../models/Sequence');
 
 const { STATUSES, SOURCES, DISCARD_REASONS } = Lead;
 const router = express.Router();
@@ -49,6 +51,19 @@ router.get('/', async (req, res) => {
       Lead.aggregate([{ $match: { userId } }, { $group: { _id: '$status', n: { $sum: 1 } } }]),
       Lead.countDocuments({ userId: req.userId, status, fit: { $lt: WEAK } }),
     ]);
+    // In outreach: which sequence, which step, when the next email goes.
+    if (status === 'in-sequence' || status === 'replied') {
+      const ens = await Enrollment.find({ userId: req.userId, leadId: { $in: leads.map(l => l._id) } }).sort({ enrolledAt: -1 }).lean();
+      const seqs = await Sequence.find({ userId: req.userId, _id: { $in: [...new Set(ens.map(e => String(e.sequenceId)))] } }, { name: 1, steps: 1 }).lean();
+      const seqBy = Object.fromEntries(seqs.map(s => [String(s._id), s]));
+      const enBy = {};
+      for (const e of ens) if (!enBy[String(e.leadId)]) enBy[String(e.leadId)] = e;
+      for (const l of leads) {
+        const e = enBy[String(l._id)];
+        const s = e && seqBy[String(e.sequenceId)];
+        if (e) l.outreach = { sequence: s ? s.name : '', step: e.step, steps: s ? s.steps.length : 0, nextAt: e.nextAt, status: e.status, stopReason: e.stopReason };
+      }
+    }
     res.json({
       leads: leads.map(shape),
       total, page, limit, pages: Math.max(1, Math.ceil(total / limit)),
@@ -95,6 +110,9 @@ async function decide(userId, ids, action, reason) {
       { $set: { status: 'approved', decidedAt: new Date(), discardReason: null } });
   }
   if (action === 'discard') {
+    // Discarding someone mid-sequence stops their emails too.
+    await Enrollment.updateMany({ userId, leadId: { $in: ids }, status: { $in: ['active', 'paused'] } },
+      { $set: { status: 'stopped', stopReason: 'manual', sendingUntil: null } });
     return Lead.updateMany({ _id: { $in: ids }, userId, status: { $ne: 'discarded' } },
       { $set: { status: 'discarded', discardReason: reason, decidedAt: new Date() } });
   }

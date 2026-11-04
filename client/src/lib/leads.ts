@@ -4,10 +4,11 @@ export const SOURCE_LABEL: Record<LeadSource, string> = {
   paste: 'Pasted', hn: 'Hacker News', news: 'Funding news', 'web-post': 'Client post',
 };
 export const STATUS_LABEL: Record<LeadStatus, string> = {
-  new: 'New', held: 'No contact yet', approved: 'Approved', discarded: 'Discarded',
+  new: 'New', held: 'No contact yet', approved: 'Approved', 'in-sequence': 'In outreach', replied: 'Replied', discarded: 'Discarded',
 };
 export const STATUS_NOTE: Record<LeadStatus, string> = {
-  new: 'Ready to review', held: 'Passed every check but has no email', approved: 'Ready for outreach', discarded: 'Hidden, with your reason',
+  new: 'Ready to review', held: 'Passed every check but has no email', approved: 'Ready for outreach',
+  'in-sequence': 'Emails going out', replied: 'They answered — see Inbox', discarded: 'Hidden, with your reason',
 };
 export const DISCARD_LABEL: Record<DiscardReason, string> = {
   'not-my-service': 'Not my service',

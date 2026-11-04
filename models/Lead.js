@@ -13,7 +13,8 @@ const mongoose = require('mongoose');
  * the existing row instead of making a new one (lib/leads/import.js).
  */
 const SOURCES = ['paste', 'hn', 'news', 'web-post'];
-const STATUSES = ['new', 'held', 'approved', 'discarded'];
+// in-sequence: emails going out (models/Enrollment.js) · replied: they answered (Inbox).
+const STATUSES = ['new', 'held', 'approved', 'in-sequence', 'replied', 'discarded'];
 const DISCARD_REASONS = ['not-my-service', 'too-small', 'agency-or-recruiter', 'spam', 'already-know', 'bad-contact', 'other'];
 
 const signalSchema = new mongoose.Schema({
@@ -55,6 +56,7 @@ const leadSchema = new mongoose.Schema({
   openerError: { type: String, default: null },
 
   status: { type: String, enum: STATUSES, default: 'new' },
+  sequenceId: { type: mongoose.Schema.Types.ObjectId, default: null },
   heldReason: { type: String, default: '' },
   discardReason: { type: String, enum: [...DISCARD_REASONS, null], default: null },
   decidedAt: { type: Date, default: null },

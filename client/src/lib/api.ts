@@ -85,7 +85,7 @@ export const loadProfile = () => apiFetch<ProfileView>('/api/profile');
 export const saveProfile = (p: Profile) => apiFetch<ProfileView>('/api/profile', jsonBody(p, 'PUT'));
 
 // ── Leads ────────────────────────────────────────────────────────────────────
-export type LeadStatus = 'new' | 'held' | 'approved' | 'discarded';
+export type LeadStatus = 'new' | 'held' | 'approved' | 'in-sequence' | 'replied' | 'discarded';
 export type LeadSource = 'paste' | 'hn' | 'news' | 'web-post';
 export type DiscardReason = 'not-my-service' | 'too-small' | 'agency-or-recruiter' | 'spam' | 'already-know' | 'bad-contact' | 'other';
 export interface Signal { text: string; source: string; url: string | null; at: string | null }
@@ -113,6 +113,8 @@ export interface Lead {
   openerState: 'none' | 'written' | 'edited' | 'failed' | 'skipped';
   openerError?: string | null;
   status: LeadStatus;
+  /** On In outreach / Replied lists: where the lead is in its sequence. */
+  outreach?: { sequence: string; step: number; steps: number; nextAt: string; status: string; stopReason: string | null };
   heldReason: string;
   discardReason: DiscardReason | null;
   createdAt: string;
@@ -199,3 +201,13 @@ export const updateSequence = (id: string, patch: Partial<Pick<Sequence, 'name' 
 export const deleteSequence = (id: string) => apiFetch<{ ok: boolean }>(`/api/outreach/sequences/${id}`, { method: 'DELETE' });
 export const previewSequence = (steps: SeqStep[], leadId?: string) =>
   apiFetch<{ lead: { id: string; name: string; person: string } | null; steps: StepPreview[] }>('/api/outreach/sequences/preview', jsonBody({ steps, leadId }));
+
+// ── Outreach: enrolment ──────────────────────────────────────────────────────
+export interface EnrollResult { added: string[]; skipped: { id: string; name: string; reason: string }[]; sequence: { id: string; name: string; active: boolean } }
+export interface LeadEnrollment {
+  status: 'active' | 'paused' | 'stopped' | 'done'; stopReason: string | null; step: number; nextAt: string; enrolledAt: string;
+  sequence: { id: string; name: string; steps: number; active: boolean } | null; lastError: string | null;
+}
+export const enrollLeads = (leadIds: string[], sequenceId: string) => apiFetch<EnrollResult>('/api/outreach/enroll', jsonBody({ leadIds, sequenceId }));
+export const stopLeads = (leadIds: string[]) => apiFetch<{ ok: boolean; stopped: number }>('/api/outreach/stop', jsonBody({ leadIds }));
+export const loadLeadEnrollment = (leadId: string) => apiFetch<{ enrollment: LeadEnrollment | null }>(`/api/outreach/lead/${leadId}`);

@@ -5,6 +5,7 @@ import HoverCard from '../components/HoverCard';
 import LeadDrawer from '../components/LeadDrawer';
 import PasteDrawer from '../components/PasteDrawer';
 import RunResultsDrawer from '../components/RunResultsDrawer';
+import AddToSequence from '../components/AddToSequence';
 import { useToast } from '../context/ToastContext';
 import {
   loadLeads, loadSources, runSource,
@@ -12,7 +13,7 @@ import {
 } from '../lib/api';
 import { CONFIDENCE, SOURCE_LABEL, STATUS_LABEL, STATUS_NOTE, fitClass, timeAgo, whoLine } from '../lib/leads';
 
-const TABS: LeadStatus[] = ['new', 'held', 'approved', 'discarded'];
+const TABS: LeadStatus[] = ['new', 'held', 'approved', 'in-sequence', 'replied', 'discarded'];
 const SOURCES: LeadSource[] = ['paste', 'hn', 'news', 'web-post'];
 const RUNNABLE: { source: RunnableSource; icon: string; note: string }[] = [
   { source: 'hn', icon: 'ti-brand-ycombinator', note: 'Contract roles and client posts from this month’s HN threads' },
@@ -100,6 +101,11 @@ export default function Leads() {
   const [running, setRunning] = useState<RunnableSource | null>(null);
   const [lastRun, setLastRun] = useState<SourceRun | null>(null);
   const [resultsFor, setResultsFor] = useState<string | null>(null);
+  const [selected, setSelected] = useState<string[]>([]);
+  // A selection belongs to one view of the list.
+  useEffect(() => { setSelected([]); }, [status, source, query, page]);
+  const selectable = status === 'new' || status === 'approved';
+  const toggleSel = (id: string) => setSelected(s => (s.includes(id) ? s.filter(x => x !== id) : [...s, id]));
 
   // Typing settles for a moment before it searches.
   useEffect(() => { const t = setTimeout(() => { setQuery(q.trim()); setPage(1); }, 300); return () => clearTimeout(t); }, [q]);
@@ -235,21 +241,37 @@ export default function Leads() {
       <div className={`table-card lr-table cl-table${loading ? ' refreshing-wrap is-refreshing' : ''}`}>
         <table>
           <thead>
-            <tr><th>Fit</th><th>Who</th><th>Why now</th><th>Source</th><th>Email</th><th>Found</th></tr>
+            <tr>
+              {selectable && (
+                <th style={{ width: 34 }}>
+                  <input type="checkbox" aria-label="Select all on this page"
+                    checked={!!list && list.leads.length > 0 && selected.length === list.leads.length}
+                    onChange={e => setSelected(e.target.checked && list ? list.leads.map(l => l.id) : [])} />
+                </th>
+              )}
+              <th>Fit</th><th>Who</th><th>{status === 'in-sequence' || status === 'replied' ? 'Outreach' : 'Why now'}</th><th>Source</th><th>Email</th><th>Found</th>
+            </tr>
           </thead>
           <tbody>
-            {error && <tr><td colSpan={6}><div className="empty-state"><i className="ti ti-alert-triangle" />{error}</div></td></tr>}
+            {error && <tr><td colSpan={selectable ? 7 : 6}><div className="empty-state"><i className="ti ti-alert-triangle" />{error}</div></td></tr>}
             {!error && list && !list.leads.length && (
-              <tr><td colSpan={6}><div className="empty-state">
+              <tr><td colSpan={selectable ? 7 : 6}><div className="empty-state">
                 <i className="ti ti-target-arrow" />
                 {query || source ? 'No leads match. Clear the search or pick All sources.'
                   : status === 'new' ? <>No leads to review yet. Use <b>Find leads</b> or paste a chat export.</>
                   : status === 'held' ? 'Nothing waiting for an email.'
-                  : status === 'approved' ? 'Nothing approved yet.' : 'Nothing discarded.'}
+                  : status === 'approved' ? 'Nothing approved yet.'
+                  : status === 'in-sequence' ? 'Nobody in a sequence yet. Open a lead and use Add to sequence.'
+                  : status === 'replied' ? 'No replies yet.' : 'Nothing discarded.'}
               </div></td></tr>
             )}
             {list && list.leads.map(l => (
               <tr key={l.id} tabIndex={0} onClick={() => setOpenId(l.id)} onKeyDown={e => { if (e.key === 'Enter') setOpenId(l.id); }}>
+                {selectable && (
+                  <td onClick={e => e.stopPropagation()}>
+                    <input type="checkbox" aria-label={`Select ${l.name}`} checked={selected.includes(l.id)} onChange={() => toggleSel(l.id)} />
+                  </td>
+                )}
                 <td>
                   <HoverCard align="left" width={300} trigger={
                     <span className={fitClass(l.fit)}>{l.fit}<span className="cl-fit-bar"><i style={{ width: `${l.fit}%` }} /></span></span>
@@ -262,7 +284,16 @@ export default function Leads() {
                   <div className="cl-row-sub">{whoLine(l)}</div>
                 </td>
                 <td style={{ maxWidth: 380, whiteSpace: 'normal' }}>
-                  <div className="cl-clamp" style={{ fontSize: 13 }}>{(l.signals[0] || {}).text || l.heldReason}</div>
+                  {l.outreach ? (
+                    <div style={{ fontSize: 13 }}>
+                      <b>{l.outreach.sequence}</b>
+                      <div className="cl-row-sub">
+                        {l.outreach.status === 'active'
+                          ? `Step ${Math.min(l.outreach.step + 1, l.outreach.steps)} of ${l.outreach.steps} · ${new Date(l.outreach.nextAt) <= new Date() ? 'due now' : `next ${new Date(l.outreach.nextAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })}`}`
+                          : l.outreach.status === 'done' ? 'All emails sent' : `Stopped — ${l.outreach.stopReason}`}
+                      </div>
+                    </div>
+                  ) : <div className="cl-clamp" style={{ fontSize: 13 }}>{(l.signals[0] || {}).text || l.heldReason}</div>}
                 </td>
                 <td><span className="cl-source">{SOURCE_LABEL[l.source]}</span></td>
                 <td>
@@ -276,6 +307,14 @@ export default function Leads() {
           </tbody>
         </table>
       </div>
+
+      {selectable && selected.length > 0 && (
+        <div className="cl-runs" style={{ position: 'sticky', bottom: 12, background: 'var(--bg)', padding: 10, borderRadius: 12, boxShadow: 'var(--shadow-md)', marginTop: 12, alignItems: 'center' }}>
+          <b>{selected.length} selected</b>
+          <AddToSequence leadIds={selected} onAdded={(a) => { setSelected(s => s.filter(id => !a.includes(id))); refresh(); }} />
+          <button className="btn btn-sm" type="button" onClick={() => setSelected([])}>Clear</button>
+        </div>
+      )}
 
       {list && list.pages > 1 && (
         <div className="lr-foot">
