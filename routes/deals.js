@@ -9,7 +9,8 @@ const Lead = require('../models/Lead');
 const Profile = require('../models/Profile');
 const Conversation = require('../models/Conversation');
 const { createDeal, flagsForDeal } = require('../lib/deals/create');
-const { paidByDeal } = require('../lib/invoices/create');
+const { paidByDeal, nextAfterPayment } = require('../lib/invoices/create');
+const Invoice = require('../models/Invoice');
 
 const router = express.Router();
 const validId = (id) => mongoose.isValidObjectId(id);
@@ -21,7 +22,17 @@ router.get('/', async (req, res) => {
   try {
     const q = { userId: req.userId };
     if (req.query.leadId && validId(req.query.leadId)) q.leadId = req.query.leadId;
-    const deals = await Deal.find(q).sort({ lastActivityAt: -1 }).limit(500).lean();
+    let deals = await Deal.find(q).sort({ lastActivityAt: -1 }).limit(500).lean();
+    // "Wait for INV-0001 to be paid" when it already is (paid before this was tracked,
+    // or marked elsewhere): work the next step out again.
+    const waiting = deals.filter(d => /^Wait for \S+ to be paid$/.test(d.next || ''));
+    if (waiting.length) {
+      const nums = waiting.map(d => d.next.split(' ')[2]);
+      const paidNums = new Set((await Invoice.find({ userId: req.userId, number: { $in: nums }, status: 'paid' }, { number: 1 }).lean()).map(i => i.number));
+      const stale = waiting.filter(d => paidNums.has(d.next.split(' ')[2]));
+      for (const d of stale) await nextAfterPayment(req.userId, d._id);
+      if (stale.length) deals = await Deal.find(q).sort({ lastActivityAt: -1 }).limit(500).lean();
+    }
     // Totals per stage and currency, in minor units.
     const totals = {};
     for (const d of deals) {
