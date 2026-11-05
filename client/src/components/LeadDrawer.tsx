@@ -1,11 +1,11 @@
 import { useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import Drawer from './Drawer';
 import AddToSequence from './AddToSequence';
 import FirstEmailCard from './FirstEmailCard';
 import { useToast } from '../context/ToastContext';
 import {
-  loadLead, saveOpener, approveLead, discardLead, restoreLead, writeLeadOpener, loadLeadEnrollment, stopLeads,
+  loadLead, saveOpener, startDeal, approveLead, discardLead, restoreLead, writeLeadOpener, loadLeadEnrollment, stopLeads,
   type LeadEnrollment,
   type DiscardReason, type Lead,
 } from '../lib/api';
@@ -23,6 +23,7 @@ export default function LeadDrawer({ id, onClose, onChanged }: {
   onChanged: (lead: Lead) => void;
 }) {
   const toast = useToast();
+  const navigate = useNavigate();
   const [lead, setLead] = useState<Lead | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [opener, setOpener] = useState('');
@@ -92,6 +93,14 @@ export default function LeadDrawer({ id, onClose, onChanged }: {
     return `Step ${Math.min(e.step + 1, e.sequence?.steps || 1)} of ${e.sequence?.steps || '?'} · ${due}`;
   };
 
+  // Talking to them for real (a call, a referral, a reply): move them into Deals.
+  const dealButton = lead && (
+    <button className="btn btn-sm" type="button" disabled={busy} title="Move them into Deals; their sequence stops"
+      onClick={async () => {
+        try { const d = await startDeal({ leadId: lead.id }); toast(d.existing ? 'Already a deal — opening it.' : 'Deal started.', 'success'); navigate(`/deals?d=${d.id}`); }
+        catch (e: any) { toast(e.message, 'error'); }
+      }}><i className="ti ti-layout-kanban" /> Start a deal</button>
+  );
   const footer = lead && (
     lead.status === 'in-sequence' ? (
       <>
@@ -100,6 +109,7 @@ export default function LeadDrawer({ id, onClose, onChanged }: {
           {enrollment && enrollment.lastError ? <><br /><span style={{ color: 'var(--red)' }}>{enrollment.lastError}</span></> : null}
         </span>
         <span className="spacer" />
+        {dealButton}
         <button className="btn btn-sm" type="button" disabled={busy}
           onClick={() => window.confirm('Stop this sequence? No more emails go to them.') && act(async () => { await stopLeads([lead.id]); return loadLead(lead.id); }, 'Sequence stopped. The lead is back in Approved.')}>
           Stop sequence
@@ -109,6 +119,7 @@ export default function LeadDrawer({ id, onClose, onChanged }: {
       <>
         <span className="cl-hint" style={{ margin: 0 }}>They replied — their sequence stopped. Answer them from Inbox.</span>
         <span className="spacer" />
+        {dealButton}
         <Link className="btn btn-primary btn-sm" to="/inbox">Open Inbox</Link>
       </>
     ) : lead.status === 'new' || lead.status === 'held' ? (
@@ -125,6 +136,7 @@ export default function LeadDrawer({ id, onClose, onChanged }: {
         {canSend ? <AddToSequence leadIds={[lead.id]} compact onAdded={(a) => { if (a.length) reload(); }} />
           : <span className="cl-hint" style={{ margin: 0 }}>The email is a guess — write to them yourself first.</span>}
         <span className="spacer" />
+        {dealButton}
         <button className="btn btn-sm" type="button" disabled={busy} onClick={() => act(() => restoreLead(lead.id), 'Moved back to review.')}>
           <i className="ti ti-arrow-back-up" /> Undo
         </button>

@@ -151,3 +151,16 @@
 @media (prefers-reduced-motion: reduce) { .cl-skel { animation: none; } }
 .cl-due-line { display: flex; gap: 8px; align-items: center; }
 .cl-due-line > input[type=checkbox] { flex-shrink: 0; }
+
+/* Deals board: a column per stage, scrolls sideways on narrow screens. */
+.cl-board { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(210px, 1fr); gap: 12px; overflow-x: auto; padding-bottom: 8px; }
+.cl-col { background: var(--canvas); border: 1px solid var(--border); border-radius: 12px; padding: 10px; min-height: 320px; display: flex; flex-direction: column; gap: 8px; }
+.cl-col.over { border-color: var(--accent); background: var(--accent-bg); }
+.cl-col-head { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; padding: 2px 4px 4px; font-size: 13px; }
+.cl-col-head span { font-size: 12px; color: var(--text3); }
+.cl-deal { border: 1px solid var(--border); background: var(--bg); border-radius: 10px; padding: 10px 11px; cursor: grab; text-align: left; width: 100%; font: inherit; color: var(--text); }
+.cl-deal:hover { border-color: var(--accent); }
+.cl-deal:active { cursor: grabbing; }
+.cl-deal .v { font-weight: 700; font-size: 14px; }
+.cl-deal .n { font-size: 13px; margin-top: 2px; }
+.cl-deal .nx { font-size: 12px; color: var(--text2); margin-top: 6px; }

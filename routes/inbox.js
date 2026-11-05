@@ -10,11 +10,10 @@ const SentEmail = require('../models/SentEmail');
 const Lead = require('../models/Lead');
 const Enrollment = require('../models/Enrollment');
 const Settings = require('../models/Settings');
-const mailer = require('../lib/mailer');
 const { checkMailbox } = require('../lib/mailbox/scan');
 const { draftReply, gapsIn } = require('../lib/inbox/draft');
 const { CATEGORIES, needsYouFor } = require('../lib/inbox/classify');
-const { toHtml } = require('../lib/outreach/send');
+const { sendInThread } = require('../lib/inbox/sendInThread');
 
 const router = express.Router();
 const validId = (id) => mongoose.isValidObjectId(id);
@@ -215,27 +214,9 @@ router.post('/:id/send', async (req, res) => {
   const gaps = gapsIn(text);
   if (gaps.length) return res.status(400).json({ error: `Fill in ${gaps.join(', ')} before sending.` });
   try {
-    const c = await Conversation.findOne({ _id: req.params.id, userId: req.userId }).lean();
+    const c = await Conversation.findOne({ _id: req.params.id, userId: req.userId }, { _id: 1 }).lean();
     if (!c) return res.status(404).json({ error: 'No such conversation' });
-    let sender;
-    try { sender = await mailer.getSender(req.userId); } catch (err) { return res.status(400).json({ error: err.message }); }
-    if (!sender) return res.status(400).json({ error: 'Connect Gmail in Free connections first.' });
-    const lastIn = [...c.messages].reverse().find(m => m.direction === 'in');
-    const ids = c.messages.map(m => m.messageId).filter(Boolean);
-    const subject = `Re: ${String(c.subject || (lastIn && lastIn.subject) || '').replace(/^(?:re|aw|sv)\s*:\s*/i, '')}`;
-    const info = await mailer.transport(sender).sendMail({
-      from: sender.name ? `"${sender.name.replace(/"/g, '')}" <${sender.email}>` : sender.email,
-      to: c.email, subject, text, html: toHtml(text),
-      ...(lastIn && lastIn.messageId ? { inReplyTo: lastIn.messageId } : {}),
-      references: ids.slice(-10),
-    }).catch(err => { throw Object.assign(new Error(mailer.isAuthError(err) ? 'Gmail refused the login — reconnect Gmail in Free connections.' : mailer.isQuotaError(err) ? 'Gmail’s daily sending limit is reached. Try again later.' : `Gmail error: ${err.message}`), { status: 400 }); });
-    const messageId = info.messageId || `<dryrun-reply-${c._id}-${Date.now()}@clientline.local>`;
-    const at = new Date();
-    await SentEmail.create({ userId: req.userId, leadId: c.leadId, conversationId: c._id, kind: 'reply', from: sender.email, to: c.email, subject, text: text.slice(0, 4000), messageId, sentAt: at });
-    await Conversation.updateOne({ _id: c._id }, {
-      $push: { messages: { $each: [{ direction: 'out', from: sender.email, subject, text: text.slice(0, 8000), messageId, inReplyTo: lastIn ? lastIn.messageId : null, at }], $slice: -50 } },
-      $set: { needsYou: false, lastAt: at, snoozedUntil: null },
-    });
+    await sendInThread(req.userId, { conversationId: c._id, text });
     res.json({ ok: true });
   } catch (err) {
     res.status(err.status || 500).json({ error: err.message });

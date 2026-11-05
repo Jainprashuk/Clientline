@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import Drawer from './Drawer';
 import { useToast } from '../context/ToastContext';
-import { loadRunItems, addRunItem, type RunItems, type RunOutcome } from '../lib/api';
+import { loadRunItems, addRunItem, runItemsXlsxUrl, type RunItems, type RunOutcome } from '../lib/api';
 import { timeAgo } from '../lib/leads';
 
 const OUTCOME: Record<RunOutcome, { label: string; cls: string }> = {
@@ -58,7 +58,12 @@ export default function RunResultsDrawer({ runId, onClose, onAdded, onOpenLead }
   return (
     <Drawer width={720} onClose={onClose}
       title={run ? `${run.label}: everything it read` : 'Results'}
-      subtitle={run ? `Run ${timeAgo(run.finishedAt || run.startedAt)} · ${run.read} read, ${checked} checked against your profile · kept ${data!.keptDays} days` : undefined}>
+      subtitle={run ? `Run ${timeAgo(run.finishedAt || run.startedAt)} · ${run.read} read, ${checked} checked against your profile · kept ${data!.keptDays} days` : undefined}
+      footer={data && data.total > 0 ? (
+        <a className="btn btn-sm" href={runItemsXlsxUrl(runId, { outcome, reason })} download>
+          <i className="ti ti-file-spreadsheet" /> Export {data.total} to Excel
+        </a>
+      ) : undefined}>
       {run && !run.logged && (
         <div className="info-box" style={{ marginBottom: 12 }}>
           <i className="ti ti-info-circle" style={{ fontSize: 15, flexShrink: 0 }} />

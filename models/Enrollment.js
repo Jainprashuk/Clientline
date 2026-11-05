@@ -8,7 +8,7 @@ const mongoose = require('mongoose');
  * "Send due emails" presses can never send the same step twice (lib/outreach/send.js).
  */
 const STATUSES = ['active', 'paused', 'stopped', 'done'];
-const STOP_REASONS = ['replied', 'bounced', 'unsubscribed', 'manual', 'no-email', 'auto-reply', null];
+const STOP_REASONS = ['replied', 'bounced', 'unsubscribed', 'manual', 'no-email', 'auto-reply', 'deal', null];
 
 const enrollmentSchema = new mongoose.Schema({
   userId: { type: mongoose.Schema.Types.ObjectId, required: true },

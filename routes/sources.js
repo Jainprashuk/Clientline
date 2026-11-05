@@ -13,6 +13,7 @@ const { loadKeys } = require('../lib/searchKeys');
 const { runInline, startRun, finishRun, record, LABELS } = require('../lib/sources/run');
 const { pasteToItems, MAX_TEXT } = require('../lib/sources/paste');
 const mongoose = require('mongoose');
+const ExcelJS = require('exceljs');
 const Lead = require('../models/Lead');
 const RunItem = require('../models/RunItem');
 const { importItems, buildLead } = require('../lib/leads/import');
@@ -80,15 +81,63 @@ router.get('/runs', async (req, res) => {
  * Everything a run read: each item with what happened to it, filterable by outcome
  * and reason, plus the counts for the filter chips. Kept 14 days (models/RunItem.js).
  */
-router.get('/runs/:id/items', async (req, res) => {
-  if (!mongoose.isValidObjectId(req.params.id)) return res.status(404).json({ error: 'No such run' });
+async function runAndFilter(req) {
+  if (!mongoose.isValidObjectId(req.params.id)) return {};
+  const run = await SourceRun.findOne({ _id: req.params.id, userId: req.userId }).lean();
+  if (!run) return {};
+  const base = { userId: run.userId, runId: run._id };
+  const filter = { ...base };
+  if (RunItem.OUTCOMES.includes(req.query.outcome)) filter.outcome = req.query.outcome;
+  if (req.query.reason) filter.reason = String(req.query.reason).slice(0, 200);
+  return { run, base, filter };
+}
+
+const OUTCOME_LABELS = {
+  lead: 'Lead', held: 'Lead, no email', added: 'Added by you', updated: 'Added to a lead',
+  repeat: 'Already had', capped: 'With others', drop: 'Skipped',
+};
+
+/** The same items as below, all pages, as an Excel file (honours the outcome/reason filter). */
+router.get('/runs/:id/items.xlsx', async (req, res) => {
   try {
-    const run = await SourceRun.findOne({ _id: req.params.id, userId: req.userId }).lean();
+    const { run, filter } = await runAndFilter(req);
     if (!run) return res.status(404).json({ error: 'No such run' });
-    const base = { userId: run.userId, runId: run._id };
-    const filter = { ...base };
-    if (RunItem.OUTCOMES.includes(req.query.outcome)) filter.outcome = req.query.outcome;
-    if (req.query.reason) filter.reason = String(req.query.reason).slice(0, 200);
+    const items = await RunItem.find(filter, { item: 0 }).sort({ outcome: 1, fit: -1, _id: 1 }).lean();
+    const book = new ExcelJS.Workbook();
+    const sheet = book.addWorksheet('Results');
+    sheet.columns = [
+      { header: 'Outcome', key: 'outcome', width: 16 },
+      { header: 'Reason', key: 'reason', width: 36 },
+      { header: 'Fit', key: 'fit', width: 6 },
+      { header: 'Where', key: 'name', width: 18 },
+      { header: 'Text', key: 'text', width: 90 },
+      { header: 'Email', key: 'email', width: 28 },
+      { header: 'Link', key: 'url', width: 50 },
+    ];
+    sheet.getRow(1).font = { bold: true };
+    sheet.views = [{ state: 'frozen', ySplit: 1 }];
+    for (const i of items) {
+      sheet.addRow({
+        outcome: OUTCOME_LABELS[i.outcome] || i.outcome, reason: i.reason || '', fit: i.fit ?? '',
+        name: i.name || '', text: i.text || '', email: i.email || '',
+        url: i.url ? { text: i.url, hyperlink: i.url } : '',
+      });
+    }
+    sheet.getColumn('text').alignment = { wrapText: true, vertical: 'top' };
+    const day = new Date(run.finishedAt || run.startedAt).toISOString().slice(0, 10);
+    const name = `${(LABELS[run.source] || run.source).replace(/[^\w-]+/g, '-')}-${day}.xlsx`;
+    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    res.setHeader('Content-Disposition', `attachment; filename="${name}"`);
+    res.send(Buffer.from(await book.xlsx.writeBuffer()));
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+router.get('/runs/:id/items', async (req, res) => {
+  try {
+    const { run, base, filter } = await runAndFilter(req);
+    if (!run) return res.status(404).json({ error: 'No such run' });
     const limit = 50;
     const page = Math.max(1, Number(req.query.page) || 1);
     const [items, total, byOutcome, byReason] = await Promise.all([

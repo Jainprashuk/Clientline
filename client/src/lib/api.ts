@@ -206,6 +206,13 @@ export function loadRunItems(runId: string, q: { outcome?: RunOutcome | ''; reas
   if (q.reason) p.set('reason', q.reason);
   return apiFetch<RunItems>(`/api/sources/runs/${runId}/items?${p}`);
 }
+/** Every item for the same filter, all pages, as an .xlsx download link. */
+export function runItemsXlsxUrl(runId: string, q: { outcome?: RunOutcome | ''; reason?: string }) {
+  const p = new URLSearchParams();
+  if (q.outcome) p.set('outcome', q.outcome);
+  if (q.reason) p.set('reason', q.reason);
+  return `${API_BASE}/api/sources/runs/${runId}/items.xlsx?${p}`;
+}
 export const addRunItem = (id: string) => apiFetch<{ ok: boolean; leadId: string; status: LeadStatus; already: boolean }>(`/api/sources/items/${id}/add`, { method: 'POST' });
 
 // ── Outreach: sequences ──────────────────────────────────────────────────────
@@ -298,3 +305,29 @@ export const reopenThread = (id: string) => apiFetch<{ ok: boolean }>(`/api/inbo
 export const setThreadCategory = (id: string, category: ReplyCategory) => apiFetch<{ ok: boolean }>(`/api/inbox/${id}/category`, jsonBody({ category }, 'PUT'));
 export const draftThreadReply = (id: string) => apiFetch<{ text: string; gaps: string[] }>(`/api/inbox/${id}/draft`, { method: 'POST' });
 export const sendThreadReply = (id: string, text: string) => apiFetch<{ ok: boolean }>(`/api/inbox/${id}/send`, jsonBody({ text }));
+
+// ── Deals ────────────────────────────────────────────────────────────────────
+export type DealStage = 'talking' | 'call' | 'proposal' | 'won' | 'progress' | 'delivered' | 'paid' | 'lost';
+export type Currency = 'INR' | 'USD' | 'EUR' | 'GBP';
+export interface DealFlag { rule: string; label: string; words: string }
+export interface CallNotes { budget: string; timeline: string; decider: string; done: string; other: string }
+export interface Deal {
+  id: string; leadId: string | null; conversationId: string | null;
+  name: string; client: string; person: string; email: string;
+  /** Minor units (paise / cents). */
+  value: number; currency: Currency; stage: DealStage; lostReason: string; next: string;
+  flags: DealFlag[]; callNotes: CallNotes; stageHistory: { stage: DealStage; at: string }[];
+  lastActivityAt: string; createdAt: string;
+}
+export interface DealDetail extends Deal {
+  thread: { id: string; subject: string; category: ReplyCategory | null; messages: InboxMessage[] } | null;
+  lead: { id: string; name: string; postUrl?: string | null; where: string } | null;
+}
+export const loadDeals = (leadId?: string) => apiFetch<{ deals: Deal[]; totals: Partial<Record<DealStage, Partial<Record<Currency, number>>>> }>(`/api/deals${leadId ? `?leadId=${leadId}` : ''}`);
+export const loadDeal = (id: string) => apiFetch<DealDetail>(`/api/deals/${id}`);
+export const startDeal = (body: { leadId?: string; conversationId?: string; name?: string; client?: string; email?: string; value?: number; currency?: Currency }) =>
+  apiFetch<Deal & { existing: boolean }>('/api/deals', jsonBody(body));
+/** `value` in major units (₹, $). */
+export const updateDeal = (id: string, patch: Partial<Omit<Deal, 'value' | 'callNotes'>> & { value?: number; callNotes?: Partial<CallNotes> }) =>
+  apiFetch<Deal>(`/api/deals/${id}`, jsonBody(patch, 'PATCH'));
+export const deleteDeal = (id: string) => apiFetch<{ ok: boolean }>(`/api/deals/${id}`, { method: 'DELETE' });

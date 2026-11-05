@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import Layout from '../components/Layout';
 import { useToast } from '../context/ToastContext';
 import {
-  loadInbox, loadThread, loadSentThread, checkReplies, snoozeThread, doneThread, reopenThread, setThreadCategory, draftThreadReply, sendThreadReply,
+  loadInbox, loadThread, loadSentThread, checkReplies, startDeal, snoozeThread, doneThread, reopenThread, setThreadCategory, draftThreadReply, sendThreadReply,
   type InboxList, type InboxThread, type ReplyCategory, type SentThread, type SentState,
 } from '../lib/api';
 import { timeAgo } from '../lib/leads';
@@ -46,6 +47,7 @@ function SentOnly({ leadId, onOpenConversation }: { leadId: string; onOpenConver
 }
 
 function Thread({ id, categories, onChanged }: { id: string; categories: InboxList['categories']; onChanged: () => void }) {
+  const navigate = useNavigate();
   const toast = useToast();
   const [t, setT] = useState<InboxThread | null>(null);
   const [text, setText] = useState('');
@@ -92,6 +94,12 @@ function Thread({ id, categories, onChanged }: { id: string; categories: InboxLi
           {t.doneAt
             ? <button className="btn btn-sm" type="button" disabled={busy !== null} onClick={() => act('reopen', () => reopenThread(id), 'Back in Needs you.')}>Reopen</button>
             : <button className="btn btn-sm" type="button" disabled={busy !== null} onClick={() => act('done', () => doneThread(id), 'Marked done.')}><i className="ti ti-check" /> Done</button>}
+          <button className="btn btn-sm btn-primary" type="button" disabled={busy !== null} title="Move this conversation into Deals; their follow-ups stop"
+            onClick={async () => {
+              setBusy('deal');
+              try { const d = await startDeal({ conversationId: id }); toast(d.existing ? 'Already a deal — opening it.' : 'Deal started.', 'success'); navigate(`/deals?d=${d.id}`); }
+              catch (e: any) { toast(e.message, 'error'); setBusy(null); }
+            }}><i className="ti ti-layout-kanban" /> Start a deal</button>
           <span style={{ position: 'relative' }}>
             <button className="btn btn-sm" type="button" onClick={() => setSnoozeOpen(o => !o)}><i className="ti ti-clock" /> Snooze</button>
             {snoozeOpen && (
@@ -150,7 +158,9 @@ export default function Inbox() {
   const [view, setView] = useState<InboxList['view']>('needs');
   const [data, setData] = useState<InboxList | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [openId, setOpenId] = useState<string | null>(null);
+  // ?c=<conversation> opens one (from a deal's "Open in Inbox").
+  const [params] = useSearchParams();
+  const [openId, setOpenId] = useState<string | null>(params.get('c'));
   const [checking, setChecking] = useState(false);
 
   const load = useCallback(() => loadInbox(view).then(d => { setData(d); setError(null); }).catch(e => setError(e.message)), [view]);
