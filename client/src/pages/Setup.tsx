@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Layout from '../components/Layout';
+import ResumeImport from '../components/ResumeImport';
 import ServicePicker from '../components/ServicePicker';
 import ChipInput from '../components/ChipInput';
 import { useToast } from '../context/ToastContext';
@@ -35,6 +36,21 @@ export default function Setup() {
   const [headline, setHeadline] = useState('');
   const [portfolioUrl, setPortfolioUrl] = useState('');
   const [work, setWork] = useState({ title: '', result: '', url: '', service: '' });
+  const [importing, setImporting] = useState(false);
+  // From a resume: everything it found goes straight into the steps, to check as you go.
+  const fromResume = (patch: Partial<Profile>) => {
+    if (patch.services) setServices(patch.services);
+    if (patch.locations) setLocations(patch.locations);
+    if (patch.name) setName(patch.name);
+    if (patch.headline) setHeadline(patch.headline);
+    if (patch.portfolioUrl) setPortfolioUrl(patch.portfolioUrl);
+    if (patch.cases && base) {
+      const added = patch.cases.slice(base.cases.length);
+      if (added[0]) setWork({ title: added[0].title, result: added[0].result, url: added[0].url, service: added[0].service });
+      // The rest go into the profile with the first; the step shows the first.
+      if (added.length > 1) setBase({ ...base, cases: [...base.cases, ...added.slice(1)] });
+    }
+  };
 
   useEffect(() => {
     loadProfile().then(v => {
@@ -86,6 +102,9 @@ export default function Setup() {
 
   return (
     <Layout title="Set up" subtitle="Four quick questions, then your first leads. You can fine-tune everything later in My profile.">
+      {importing && base && (
+        <ResumeImport profile={{ ...base, services, locations, name, headline, portfolioUrl }} onApply={fromResume} onClose={() => setImporting(false)} />
+      )}
       <div className="cl-setup">
         <div className="cl-steps" aria-hidden="true">{[0, 1, 2, 3].map(i => <span key={i} className={i <= step ? 'on' : ''} />)}</div>
 
@@ -93,6 +112,9 @@ export default function Setup() {
           <div className="s-card"><div className="s-body">
             <h2>What do you do?</h2>
             <p className="lead">Pick everything you’d take on. Not in the list? Add your own below.</p>
+            <button type="button" className="btn" style={{ marginBottom: 14 }} onClick={() => setImporting(true)}>
+              <i className="ti ti-file-cv" /> Have a resume? Start from it
+            </button>
             <ServicePicker value={services} onChange={setServices} />
           </div></div>
         )}

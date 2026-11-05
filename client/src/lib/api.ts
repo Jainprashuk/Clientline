@@ -84,6 +84,13 @@ export interface Profile {
 }
 /** A piece of past work; `service` is which of your services it proves. */
 export interface ProfileCase { title: string; result: string; url: string; service: string; client: string }
+/** What "Fill from resume" found (lib/profile/resume.js). Nothing is saved until you save the profile. */
+export interface ResumeSuggestion {
+  name: string; headline: string; portfolioUrl: string; location: string; services: string[];
+  projects: { title: string; result: string; url: string; service: string }[];
+}
+export const readResume = (text: string, services: string[]) =>
+  apiFetch<{ suggestion: ResumeSuggestion }>('/api/profile/from-resume', jsonBody({ text, services }));
 export interface ProfileView { profile: Profile; complete: boolean; missing: string[] }
 
 export const loadProfile = () => apiFetch<ProfileView>('/api/profile');

@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import Layout from '../components/Layout';
 import ChipInput from '../components/ChipInput';
 import ServicePicker from '../components/ServicePicker';
+import ResumeImport from '../components/ResumeImport';
 import { LOCATION_OPTIONS, EXCLUSION_OPTIONS, suggestKeywords } from '../lib/presets';
 import { useToast } from '../context/ToastContext';
 import { loadProfile, saveProfile, type Profile as ProfileData, type ProfileView } from '../lib/api';
@@ -82,6 +83,7 @@ export default function Profile() {
   }, []);
 
   const dirty = useMemo(() => !!view && JSON.stringify(p) !== saved, [p, saved, view]);
+  const [importing, setImporting] = useState(false);
   const set = <K extends keyof ProfileData>(k: K, v: ProfileData[K]) => setP(prev => ({ ...prev, [k]: v }));
   const setService = (i: number, patch: Partial<ProfileData['services'][number]>) =>
     set('services', p.services.map((s, n) => (n === i ? { ...s, ...patch } : s)));
@@ -113,7 +115,9 @@ export default function Profile() {
   );
 
   return (
-    <Layout title="My profile" subtitle="What you sell and to whom. Leads are judged against this, and first lines may only use what is here." actions={view ? saveBtn : undefined}>
+    <Layout title="My profile" subtitle="What you sell and to whom. Leads are judged against this, and your emails may only use what is here."
+      actions={view ? <><button className="btn" type="button" onClick={() => setImporting(true)}><i className="ti ti-file-cv" /> Fill from resume</button>{saveBtn}</> : undefined}>
+      {importing && <ResumeImport profile={p} onApply={patch => setP(prev => ({ ...prev, ...patch }))} onClose={() => setImporting(false)} />}
       {error && <div className="info-box danger"><i className="ti ti-alert-triangle" /> {error}</div>}
       {!view && !error && <div className="empty-state"><i className="ti ti-loader" />Loading…</div>}
       {view && (

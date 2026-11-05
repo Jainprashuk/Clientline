@@ -5,6 +5,7 @@
  */
 const express = require('express');
 const Profile = require('../models/Profile');
+const { readResume } = require('../lib/profile/resume');
 
 const { CLIENT_TYPES, COMPANY_SIZES, CURRENCIES, LIMITS, missingFor } = Profile;
 const router = express.Router();
@@ -94,6 +95,22 @@ router.put('/', async (req, res) => {
     res.json(view(saved));
   } catch (err) {
     if (err.name === 'ValidationError') return res.status(400).json({ error: err.message });
+    res.status(500).json({ error: err.message });
+  }
+});
+
+/**
+ * Suggestions for the profile from a resume's text (read in the browser). Saves
+ * nothing: the page shows them to tick, then saves through PUT / as usual.
+ */
+router.post('/from-resume', async (req, res) => {
+  const { text, services } = req.body || {};
+  if (typeof text !== 'string' || !text.trim()) return res.status(400).json({ error: 'Add your resume first.' });
+  try {
+    const r = await readResume(req.userId, text, services);
+    if (!r.ok) return res.status(r.noKeys ? 400 : 422).json({ error: r.noKeys ? r.error : `Couldn’t read it cleanly: ${r.error}`, code: r.noKeys ? 'AI_KEY_REQUIRED' : undefined });
+    res.json({ suggestion: r.suggestion });
+  } catch (err) {
     res.status(500).json({ error: err.message });
   }
 });

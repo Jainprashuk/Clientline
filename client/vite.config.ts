@@ -16,7 +16,8 @@ export default defineConfig({
       output: {
         entryFileNames: 'assets/app.js',
         chunkFileNames: 'assets/[name].js',
-        assetFileNames: 'assets/app.[ext]',
+        // The stylesheet keeps its fixed name; other files (pdf.js's worker) keep their own.
+        assetFileNames: (info) => (/\.css$/.test(info.name || '') ? 'assets/app.[ext]' : 'assets/[name].[ext]'),
       },
     },
   },
