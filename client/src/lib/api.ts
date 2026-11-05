@@ -393,3 +393,22 @@ export const markInvoicePaid = (id: string, paid: boolean) => apiFetch<Invoice &
 export const voidInvoice = (id: string) => apiFetch<Invoice>(`/api/invoices/${id}/void`, { method: 'POST' });
 export const invoicePreviewUrl = (id: string) => `${API_BASE}/api/invoices/${id}/preview`;
 export const proposalPdfUrl = (id: string) => `${API_BASE}/api/proposals/${id}/pdf`;
+
+// ── Projects (won deals while the work happens) ──────────────────────────────
+export interface ProjectTask { id: string; text: string; done: boolean; doneAt?: string | null; fromProposal?: boolean }
+export interface ProjectPayment { part?: number; label: string; amount: number; currency: Currency; invoice: { id: string; number: string; status: Invoice['status']; total: number; dueAt: string | null; paidAt: string | null; overdue: boolean } | null }
+export interface Project {
+  id: string; name: string; client: string; person: string; email: string; stage: DealStage; value: number; currency: Currency; next: string; conversationId: string | null;
+  project: { started: boolean; startedAt: string | null; targetAt: string | null; tasks: ProjectTask[]; links: { label: string; url: string }[]; notes: { id: string; text: string; at: string }[]; updates: { text: string; at: string }[] };
+  health: { pct: number; done: number; total: number; state: 'ok' | 'soon' | 'behind' | 'late' | 'delivered' | 'none'; label: string; days?: number };
+  payments: ProjectPayment[]; nextPayment: { text: string; tone: 'late' | 'wait' | 'todo' | 'later' | 'ok' } | null;
+  proposal: { id: string; title: string; option: string | null; weeks: number | null } | null;
+  /** Paid so far, before GST (minor units). */
+  paid: number;
+}
+export const loadProjects = () => apiFetch<{ projects: Project[] }>('/api/projects');
+export const loadProject = (id: string) => apiFetch<Project>(`/api/projects/${id}`);
+export const changeProject = (id: string, change: Record<string, unknown>) => apiFetch<Project>(`/api/projects/${id}`, jsonBody(change, 'PATCH'));
+export const projectPaymentInvoice = (id: string, part: number) => apiFetch<{ invoiceId: string }>(`/api/projects/${id}/payments/${part}`, { method: 'POST' });
+export const draftProjectUpdate = (id: string) => apiFetch<{ text: string }>(`/api/projects/${id}/update/draft`, { method: 'POST' });
+export const sendProjectUpdate = (id: string, text: string) => apiFetch<Project>(`/api/projects/${id}/update/send`, jsonBody({ text }));

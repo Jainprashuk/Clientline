@@ -1,14 +1,16 @@
 import { useCallback, useEffect, useState } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import Layout from '../components/Layout';
 import Drawer from '../components/Drawer';
 import DealDrawer, { STAGE_LABEL } from '../components/DealDrawer';
 import { useToast } from '../context/ToastContext';
-import { loadDeals, startDeal, updateDeal, type Currency, type Deal, type DealStage } from '../lib/api';
+import { loadDeals, loadInvoices, startDeal, updateDeal, type Currency, type Deal, type DealStage, type Money } from '../lib/api';
 import { money, totals } from '../lib/money';
 import { timeAgo } from '../lib/leads';
 
-const BOARD: DealStage[] = ['talking', 'call', 'proposal', 'won', 'progress', 'delivered', 'paid'];
+// Winning the work only; once won, a deal is a project (pages/Work.tsx).
+const BOARD: DealStage[] = ['talking', 'call', 'proposal'];
+const WON: DealStage[] = ['won', 'progress', 'delivered'];
 
 function NewDeal({ onClose, onCreated }: { onClose: () => void; onCreated: (d: Deal) => void }) {
   const toast = useToast();
@@ -54,7 +56,11 @@ export default function Deals() {
   const openId = params.get('d');
   const open = (id: string | null) => setParams(p => { const n = new URLSearchParams(p); if (id) n.set('d', id); else n.delete('d'); return n; });
 
-  const load = useCallback(() => loadDeals().then(r => { setDeals(r.deals); setError(null); }).catch(e => setError(e.message)), []);
+  const [money_, setMoney] = useState<{ waiting: Money; paidMonth: Money } | null>(null);
+  const load = useCallback(() => {
+    loadInvoices().then(r => setMoney({ waiting: r.waiting, paidMonth: r.paidMonth })).catch(() => {});
+    return loadDeals().then(r => { setDeals(r.deals); setError(null); }).catch(e => setError(e.message));
+  }, []);
   useEffect(() => { load(); }, [load]);
 
   const replace = (d: Deal) => setDeals(list => (list ? (list.some(x => x.id === d.id) ? list.map(x => (x.id === d.id ? d : x)) : [d, ...list]) : [d]));
@@ -72,7 +78,10 @@ export default function Deals() {
     for (const d of list) t[d.currency] = (t[d.currency] || 0) + d.value;
     return totals(t);
   };
-  const openDeals = (deals || []).filter(d => !['paid', 'lost'].includes(d.stage));
+  const sales = (deals || []).filter(d => BOARD.includes(d.stage));
+  const won = (deals || []).filter(d => WON.includes(d.stage));
+  const monthStart = new Date(); monthStart.setDate(1); monthStart.setHours(0, 0, 0, 0);
+  const wonThisMonth = (deals || []).filter(d => d.stageHistory.some(h => h.stage === 'won' && new Date(h.at) >= monthStart));
   const lost = byStage('lost');
 
   return (
@@ -82,9 +91,14 @@ export default function Deals() {
       {!deals && !error && <div className="empty-state"><i className="ti ti-loader" />Loading…</div>}
       {deals && (
         <>
+          <div className="cl-stats">
+            <div><span>In the pipeline</span><b>{sum(sales) || '—'}</b><small>{sales.length} deal{sales.length === 1 ? '' : 's'} being talked about</small></div>
+            <div><span>Won this month</span><b>{sum(wonThisMonth) || '—'}</b><small>{wonThisMonth.length} deal{wonThisMonth.length === 1 ? '' : 's'}</small></div>
+            <div><span>Paid this month</span><b>{(money_ && totals(money_.paidMonth)) || '—'}</b><small>marked paid on invoices</small></div>
+            <div><span>Waiting to be paid</span><b>{(money_ && totals(money_.waiting)) || '—'}</b><small>invoices sent, not paid yet</small></div>
+          </div>
           <div className="cl-meta" style={{ marginBottom: 12 }}>
-            <span><b style={{ color: 'var(--text)' }}>{sum(openDeals) || '—'}</b> in {openDeals.length} open deal{openDeals.length === 1 ? '' : 's'}</span>
-            {byStage('paid').length > 0 && <span>· {sum(byStage('paid'))} paid</span>}
+            {won.length > 0 && <Link to="/work" className="btn btn-sm"><i className="ti ti-checklist" /> {won.length} won → Projects</Link>}
             <span style={{ flex: 1 }} />
             {lost.length > 0 && <button className="btn btn-sm" type="button" onClick={() => setShowLost(v => !v)}>{showLost ? 'Hide' : 'Show'} lost ({lost.length})</button>}
           </div>

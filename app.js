@@ -95,6 +95,7 @@ app.use('/api/inbox', require('./routes/inbox'));
 app.use('/api/deals', require('./routes/deals'));
 app.use('/api/proposals', require('./routes/proposals'));
 app.use('/api/invoices', require('./routes/invoices'));
+app.use('/api/projects', require('./routes/projects'));
 
 // ── Pages ───────────────────────────────────────────────────────────────────
 app.get('/login', (_req, res) => res.sendFile(path.join(__dirname, 'login.html')));

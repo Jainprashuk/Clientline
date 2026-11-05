@@ -35,6 +35,17 @@ const dealSchema = new mongoose.Schema({
     other: { type: String, default: '', maxlength: 2000 },
   },
   stageHistory: { type: [{ stage: String, at: Date, _id: false }], default: [] },
+  // Once won, the work itself (lib/projects/project.js): a checklist (seeded from the
+  // accepted option's items), dates, links, a notes log and the updates you sent.
+  project: {
+    started: { type: Boolean, default: false },          // seeded from the proposal
+    startedAt: { type: Date, default: null },
+    targetAt: { type: Date, default: null },
+    tasks: { type: [{ text: { type: String, maxlength: 300 }, done: { type: Boolean, default: false }, doneAt: Date, fromProposal: Boolean }], default: [] },
+    links: { type: [{ label: { type: String, maxlength: 80 }, url: { type: String, maxlength: 500 }, _id: false }], default: [] },
+    notes: { type: [{ text: { type: String, maxlength: 2000 }, at: Date }], default: [] },
+    updates: { type: [{ text: { type: String, maxlength: 4000 }, at: Date, _id: false }], default: [] },
+  },
   lastActivityAt: { type: Date, default: Date.now },
 }, { timestamps: true });
 
