@@ -55,6 +55,14 @@ const profileSchema = new mongoose.Schema({
   cases: { type: [{ title: { type: String, maxlength: 120 }, result: { type: String, maxlength: 300 }, url: { type: String, maxlength: 300 },
     service: { type: String, maxlength: 80, default: '' }, client: { type: String, maxlength: 80, default: '' }, _id: false }], default: [] },
 
+  // Proposals: how payment is split (start / halfway / delivery, in %), rounds of
+  // changes included, and how long a proposal stays open.
+  proposalTerms: {
+    split: { type: [Number], default: [30, 40, 30] },
+    rounds: { type: Number, default: 2, min: 0, max: 10 },
+    validDays: { type: Number, default: 14, min: 1, max: 90 },
+  },
+
   // Which sources run for this account, and how many web searches a day.
   sources: {
     hn: { type: Boolean, default: true },

@@ -1,8 +1,8 @@
 import { useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import Drawer from './Drawer';
 import { useToast } from '../context/ToastContext';
-import { deleteDeal, loadDeal, updateDeal, type CallNotes, type Currency, type Deal, type DealDetail, type DealStage } from '../lib/api';
+import { createProposal, deleteDeal, loadDeal, loadProposals, updateDeal, type Proposal, type CallNotes, type Currency, type Deal, type DealDetail, type DealStage } from '../lib/api';
 import { money } from '../lib/money';
 import { timeAgo } from '../lib/leads';
 
@@ -30,6 +30,16 @@ export default function DealDrawer({ id, onClose, onChanged, onDeleted }: {
   const [d, setD] = useState<DealDetail | null>(null);
   const [form, setForm] = useState<{ name: string; client: string; email: string; value: string; currency: Currency; next: string; stage: DealStage; lostReason: string; notes: CallNotes } | null>(null);
   const [busy, setBusy] = useState(false);
+  const navigate = useNavigate();
+  const [proposals, setProposals] = useState<Proposal[]>([]);
+  const [writing, setWriting] = useState<'ai' | 'blank' | null>(null);
+  useEffect(() => { loadProposals(id).then(r => setProposals(r.proposals)).catch(() => {}); }, [id]);
+  const newProposal = async (ai: boolean) => {
+    setWriting(ai ? 'ai' : 'blank');
+    try { const p = await createProposal(id, ai); navigate(`/proposals?p=${p.id}`); }
+    catch (e: any) { toast(e.message, 'error', 9000); }
+    finally { setWriting(null); }
+  };
 
   const fill = (x: DealDetail) => {
     setD(x);
@@ -97,6 +107,23 @@ export default function DealDrawer({ id, onClose, onChanged, onDeleted }: {
           <label className="form-label" htmlFor="dl-next">Your next step</label>
           <input id="dl-next" type="text" maxLength={200} value={form.next} placeholder="Send the price · Call Thursday 4 pm · Ask what “urgent” means" onChange={e => set({ next: e.target.value })} />
         </div>
+      </div>
+
+      <div className="cl-sect">
+        <h3>Proposals</h3>
+        {proposals.map(p => (
+          <Link key={p.id} to={`/proposals?p=${p.id}`} className="cl-row-sub" style={{ display: 'block', padding: '4px 0' }}>
+            <b style={{ color: 'var(--text)' }}>{p.title}</b> · {p.status === 'accepted' && p.acceptedBy ? `accepted by ${p.acceptedBy.name}` : p.sentAt ? `sent${p.views ? `, opened ${p.views}×` : ', not opened yet'}` : 'draft'}
+          </Link>
+        ))}
+        <div className="cl-meta" style={{ marginTop: 6 }}>
+          <button className="btn btn-sm btn-primary" type="button" disabled={!!writing} onClick={() => newProposal(true)}
+            title="Three options drafted from the thread, your call notes and your profile — you check and edit before sending">
+            {writing === 'ai' ? <><i className="ti ti-loader" /> Drafting…</> : <><i className="ti ti-sparkles" /> Write a proposal</>}
+          </button>
+          <button className="btn btn-sm" type="button" disabled={!!writing} onClick={() => newProposal(false)}>Start blank</button>
+        </div>
+        {!d.callNotes.done && !d.thread && <div className="cl-hint">Tip: fill “What done looks like” in the call notes first — the draft is built on it.</div>}
       </div>
 
       {d.flags.length > 0 && (

@@ -331,3 +331,32 @@ export const startDeal = (body: { leadId?: string; conversationId?: string; name
 export const updateDeal = (id: string, patch: Partial<Omit<Deal, 'value' | 'callNotes'>> & { value?: number; callNotes?: Partial<CallNotes> }) =>
   apiFetch<Deal>(`/api/deals/${id}`, jsonBody(patch, 'PATCH'));
 export const deleteDeal = (id: string) => apiFetch<{ ok: boolean }>(`/api/deals/${id}`, { method: 'DELETE' });
+
+// ── Proposals ────────────────────────────────────────────────────────────────
+export interface ProposalOption { name: string; /** minor units */ price: number; weeks: number; items: string[]; suggested: boolean }
+export interface Proposal {
+  id: string; dealId: string; title: string; intro: string; currency: Currency; options: ProposalOption[];
+  terms: { split: number[]; rounds: number; validDays: number; note: string };
+  proof: { title: string; result: string; url: string } | null;
+  status: 'draft' | 'sent' | 'viewed' | 'accepted' | 'declined';
+  sentAt: string | null; views: number; firstViewAt: string | null; lastViewAt: string | null; nudgedAt: string | null;
+  acceptedBy: { name: string; option: number; at: string } | null;
+  draftedBy: 'ai' | 'you'; link: string; gaps: string[]; nudge: string | null; expired: boolean; expiresAt: string | null;
+  deal?: { id: string; name: string; client: string; person: string; email: string; stage: DealStage };
+  opens?: { at: string; ua: string }[];
+  updatedAt: string; createdAt: string;
+}
+/** Editor shape: prices in major units. */
+export type ProposalPatch = Partial<Pick<Proposal, 'title' | 'intro'>> & {
+  options?: (Omit<ProposalOption, 'price'> & { price: number })[];
+  terms?: Partial<Proposal['terms']>;
+};
+export const loadProposals = (dealId?: string) => apiFetch<{ proposals: Proposal[] }>(`/api/proposals${dealId ? `?dealId=${dealId}` : ''}`);
+export const loadProposal = (id: string) => apiFetch<Proposal>(`/api/proposals/${id}`);
+export const createProposal = (dealId: string, ai: boolean) => apiFetch<Proposal>('/api/proposals', jsonBody({ dealId, ai }));
+export const saveProposal = (id: string, patch: ProposalPatch) => apiFetch<Proposal>(`/api/proposals/${id}`, jsonBody(patch, 'PUT'));
+export const proposalMessage = (id: string) => apiFetch<{ text: string; to: string | null }>(`/api/proposals/${id}/message`);
+export const sendProposal = (id: string, message: string) => apiFetch<Proposal>(`/api/proposals/${id}/send`, jsonBody({ message }));
+export const nudgeProposal = (id: string, message: string) => apiFetch<Proposal>(`/api/proposals/${id}/nudge`, jsonBody({ message }));
+export const deleteProposal = (id: string) => apiFetch<{ ok: boolean }>(`/api/proposals/${id}`, { method: 'DELETE' });
+export const proposalPreviewUrl = (id: string) => `${API_BASE}/api/proposals/${id}/preview`;

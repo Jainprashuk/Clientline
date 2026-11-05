@@ -77,6 +77,10 @@ app.use('/u', async (_req, res, next) => {
   const { outreachSendRun, outreachMailboxHourly, outreachMailboxCheck } = require('./lib/outreach/inngest');
   app.use('/api/inngest', serve({ client: inngest, functions: [outreachSendRun, outreachMailboxHourly, outreachMailboxCheck] }));
 }
+// Proposal pages a client opens from a link: public, the token is the key.
+app.use('/p', async (_req, res, next) => {
+  try { await ensureDb(); next(); } catch (err) { res.status(503).send('Please try again in a minute.'); }
+}, express.urlencoded({ extended: false, limit: '20kb' }), require('./routes/publicDocs').proposals);
 app.use(requireAuth);
 app.use('/api/auth', authRoutes);
 app.use('/api/connections', require('./routes/connections'));
@@ -86,6 +90,7 @@ app.use('/api/sources', require('./routes/sources'));
 app.use('/api/outreach', require('./routes/outreach'));
 app.use('/api/inbox', require('./routes/inbox'));
 app.use('/api/deals', require('./routes/deals'));
+app.use('/api/proposals', require('./routes/proposals'));
 
 // ── Pages ───────────────────────────────────────────────────────────────────
 app.get('/login', (_req, res) => res.sendFile(path.join(__dirname, 'login.html')));

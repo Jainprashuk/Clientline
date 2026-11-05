@@ -31,6 +31,16 @@ const url = (v) => {
   return /^https?:\/\/[^\s]+$/i.test(s) ? s : '';
 };
 
+/** Payment split in whole percents adding to 100 (else the default), rounds, validity. */
+function cleanTerms(t = {}) {
+  const split = (Array.isArray(t.split) ? t.split : []).map(n => Math.round(Number(n))).filter(n => Number.isFinite(n) && n > 0).slice(0, 4);
+  return {
+    split: split.length && split.reduce((a, b) => a + b, 0) === 100 ? split : [30, 40, 30],
+    rounds: Math.min(10, Math.max(0, Math.round(Number(t.rounds)) || 0)) || (t.rounds === 0 ? 0 : 2),
+    validDays: Math.min(90, Math.max(1, Math.round(Number(t.validDays)) || 14)),
+  };
+}
+
 function clean(body = {}) {
   const services = (Array.isArray(body.services) ? body.services : [])
     .map(s => ({ name: text(s && s.name, 80), keywords: phrases(s && s.keywords, LIMITS.keywords, 40), minBudget: money(s && s.minBudget) }))
@@ -62,6 +72,7 @@ function clean(body = {}) {
       .map(c => ({ title: text(c && c.title, 120), result: text(c && c.result, 300), url: url(c && c.url), service: text(c && c.service, 80), client: text(c && c.client, 80) }))
       .filter(c => c.title && c.result)
       .slice(0, LIMITS.cases),
+    proposalTerms: cleanTerms(body.proposalTerms),
     sources: {
       hn: src.hn !== false,
       news: src.news !== false,
