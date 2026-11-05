@@ -81,6 +81,9 @@ app.use('/u', async (_req, res, next) => {
 app.use('/p', async (_req, res, next) => {
   try { await ensureDb(); next(); } catch (err) { res.status(503).send('Please try again in a minute.'); }
 }, express.urlencoded({ extended: false, limit: '20kb' }), require('./routes/publicDocs').proposals);
+app.use('/i', async (_req, res, next) => {
+  try { await ensureDb(); next(); } catch (err) { res.status(503).send('Please try again in a minute.'); }
+}, require('./routes/publicDocs').invoices);
 app.use(requireAuth);
 app.use('/api/auth', authRoutes);
 app.use('/api/connections', require('./routes/connections'));
@@ -91,6 +94,7 @@ app.use('/api/outreach', require('./routes/outreach'));
 app.use('/api/inbox', require('./routes/inbox'));
 app.use('/api/deals', require('./routes/deals'));
 app.use('/api/proposals', require('./routes/proposals'));
+app.use('/api/invoices', require('./routes/invoices'));
 
 // ── Pages ───────────────────────────────────────────────────────────────────
 app.get('/login', (_req, res) => res.sendFile(path.join(__dirname, 'login.html')));

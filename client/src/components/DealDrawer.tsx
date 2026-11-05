@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import Drawer from './Drawer';
 import { useToast } from '../context/ToastContext';
-import { createProposal, deleteDeal, loadDeal, loadProposals, updateDeal, type Proposal, type CallNotes, type Currency, type Deal, type DealDetail, type DealStage } from '../lib/api';
+import { createProposal, deleteDeal, invoiceRest, loadDeal, loadInvoices, loadProposals, updateDeal, type Invoice, type Proposal, type CallNotes, type Currency, type Deal, type DealDetail, type DealStage } from '../lib/api';
 import { money } from '../lib/money';
 import { timeAgo } from '../lib/leads';
 
@@ -34,6 +34,9 @@ export default function DealDrawer({ id, onClose, onChanged, onDeleted }: {
   const [proposals, setProposals] = useState<Proposal[]>([]);
   const [writing, setWriting] = useState<'ai' | 'blank' | null>(null);
   useEffect(() => { loadProposals(id).then(r => setProposals(r.proposals)).catch(() => {}); }, [id]);
+  const [invoices, setInvoices] = useState<Invoice[]>([]);
+  const loadInv = () => loadInvoices(id).then(r => setInvoices(r.invoices)).catch(() => {});
+  useEffect(() => { loadInv(); }, [id]); // eslint-disable-line react-hooks/exhaustive-deps
   const newProposal = async (ai: boolean) => {
     setWriting(ai ? 'ai' : 'blank');
     try { const p = await createProposal(id, ai); navigate(`/proposals?p=${p.id}`); }
@@ -125,6 +128,23 @@ export default function DealDrawer({ id, onClose, onChanged, onDeleted }: {
         </div>
         {!d.callNotes.done && !d.thread && <div className="cl-hint">Tip: fill “What done looks like” in the call notes first — the draft is built on it.</div>}
       </div>
+
+      {(invoices.length > 0 || proposals.some(p => p.status === 'accepted')) && (
+        <div className="cl-sect">
+          <h3>Invoices</h3>
+          {invoices.map(i => (
+            <Link key={i.id} to={`/invoices?i=${i.id}`} className="cl-row-sub" style={{ display: 'block', padding: '4px 0' }}>
+              <b style={{ color: 'var(--text)' }}>{i.number}</b> · {money(i.total, i.currency)} · {i.status === 'paid' ? 'paid' : i.status === 'void' ? 'cancelled' : i.status === 'draft' ? 'draft — check and send' : i.overdue ? 'overdue' : 'sent'}
+            </Link>
+          ))}
+          {proposals.some(p => p.status === 'accepted') && (
+            <button className="btn btn-sm" type="button" style={{ marginTop: 6 }}
+              onClick={async () => { try { const r = await invoiceRest(d.id); toast(r.made.length ? `Drafted ${r.made.length} invoice${r.made.length === 1 ? '' : 's'} for the rest.` : 'Everything is already invoiced.', 'success'); loadInv(); } catch (e: any) { toast(e.message, 'error'); } }}>
+              <i className="ti ti-receipt" /> Invoice the rest
+            </button>
+          )}
+        </div>
+      )}
 
       {d.flags.length > 0 && (
         <div className="cl-sect">

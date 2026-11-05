@@ -12,6 +12,9 @@ const { hashToken, ipHash } = require('../lib/docs/token');
 const { notFound } = require('../lib/docs/page');
 const { renderProposal } = require('../lib/proposals/page');
 const { acceptProposal } = require('../lib/proposals/accept');
+const Invoice = require('../models/Invoice');
+const { renderInvoice } = require('../lib/invoices/page');
+require('../lib/invoices/create');   // registers the deposit invoice on accept
 
 const proposals = express.Router();
 
@@ -58,4 +61,21 @@ proposals.post('/:token', async (req, res) => {
   }
 });
 
-module.exports = { proposals };
+// ── Invoices: /i/<token> ─────────────────────────────────────────────────────
+const invoices = express.Router();
+invoices.get('/:token', async (req, res) => {
+  noStore(res);
+  try {
+    const inv = /^[\w-]{20,80}$/.test(req.params.token) ? await Invoice.findOne({ tokenHash: hashToken(req.params.token) }).lean() : null;
+    if (!inv || inv.status === 'draft') return res.status(404).send(notFound());
+    if (['sent', 'viewed'].includes(inv.status)) {
+      await Invoice.updateOne({ _id: inv._id }, { $inc: { views: 1 }, $set: { lastViewAt: new Date(), ...(inv.status === 'sent' ? { status: 'viewed' } : {}) } });
+    }
+    const [p, s] = await Promise.all([Profile.findOne({ userId: inv.userId }).lean(), Settings.findOne({ userId: inv.userId }, { senderName: 1, gmailEmail: 1 }).lean()]);
+    res.send(await renderInvoice(inv, { from: { name: (s && s.senderName) || (p && p.name) || '', email: (s && s.gmailEmail) || '', billing: (p && p.billing) || {} } }));
+  } catch (err) {
+    res.status(500).send('Something went wrong. Please try again in a minute.');
+  }
+});
+
+module.exports = { proposals, invoices };

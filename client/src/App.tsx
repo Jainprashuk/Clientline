@@ -11,6 +11,7 @@ import Outreach from './pages/Outreach';
 import Inbox from './pages/Inbox';
 import Deals from './pages/Deals';
 import Proposals from './pages/Proposals';
+import Invoices from './pages/Invoices';
 import SendWidget from './components/SendWidget';
 
 // Built sections; every other one is still a ComingSoon placeholder.
@@ -22,6 +23,7 @@ const PAGES: Record<string, () => JSX.Element> = {
   '/inbox': Inbox,
   '/deals': Deals,
   '/proposals': Proposals,
+  '/invoices': Invoices,
 };
 
 // Signed-out visitors go to the login page, which is served outside the SPA,

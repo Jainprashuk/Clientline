@@ -63,6 +63,19 @@ const profileSchema = new mongoose.Schema({
     validDays: { type: Number, default: 14, min: 1, max: 90 },
   },
 
+  // Getting paid: what invoices show. GST only if you're registered (over ₹20 lakh
+  // a year it's required); UPI for Indian clients, bank/PayPal/Wise text for others.
+  billing: {
+    legalName: { type: String, default: '', trim: true, maxlength: 160 },
+    address: { type: String, default: '', trim: true, maxlength: 500 },
+    taxId: { type: String, default: '', trim: true, maxlength: 40 },        // PAN or GSTIN
+    gstPercent: { type: Number, default: 0, min: 0, max: 28 },
+    upiId: { type: String, default: '', trim: true, maxlength: 120 },
+    payDetails: { type: String, default: '', trim: true, maxlength: 800 }, // bank / PayPal / Wise
+    prefix: { type: String, default: 'INV', trim: true, maxlength: 12 },
+    paymentDays: { type: Number, default: 7, min: 0, max: 90 },
+  },
+
   // Which sources run for this account, and how many web searches a day.
   sources: {
     hn: { type: Boolean, default: true },

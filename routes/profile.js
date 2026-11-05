@@ -41,6 +41,20 @@ function cleanTerms(t = {}) {
   };
 }
 
+function cleanBilling(b = {}) {
+  const upi = text(b.upiId, 120);
+  return {
+    legalName: text(b.legalName, 160),
+    address: String(b.address == null ? '' : b.address).trim().slice(0, 500),
+    taxId: text(b.taxId, 40).toUpperCase(),
+    gstPercent: [0, 5, 12, 18, 28].includes(Number(b.gstPercent)) ? Number(b.gstPercent) : 0,
+    upiId: /^[\w.-]{2,256}@[a-zA-Z][a-zA-Z0-9.-]{1,64}$/.test(upi) ? upi : '',
+    payDetails: String(b.payDetails == null ? '' : b.payDetails).trim().slice(0, 800),
+    prefix: text(b.prefix, 12).replace(/[^\w-]/g, '') || 'INV',
+    paymentDays: Math.min(90, Math.max(0, Math.round(Number(b.paymentDays)) || 7)),
+  };
+}
+
 function clean(body = {}) {
   const services = (Array.isArray(body.services) ? body.services : [])
     .map(s => ({ name: text(s && s.name, 80), keywords: phrases(s && s.keywords, LIMITS.keywords, 40), minBudget: money(s && s.minBudget) }))
@@ -73,6 +87,7 @@ function clean(body = {}) {
       .filter(c => c.title && c.result)
       .slice(0, LIMITS.cases),
     proposalTerms: cleanTerms(body.proposalTerms),
+    billing: cleanBilling(body.billing),
     sources: {
       hn: src.hn !== false,
       news: src.news !== false,

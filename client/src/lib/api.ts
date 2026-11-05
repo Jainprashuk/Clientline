@@ -81,6 +81,8 @@ export interface Profile {
   exclusions: string[];
   proof: { who: string; text: string }[];
   cases: ProfileCase[];
+  proposalTerms: { split: number[]; rounds: number; validDays: number };
+  billing: { legalName: string; address: string; taxId: string; gstPercent: number; upiId: string; payDetails: string; prefix: string; paymentDays: number };
   sources: { hn: boolean; news: boolean; web: boolean; webPerDay: number };
 }
 /** A piece of past work; `service` is which of your services it proves. */
@@ -360,3 +362,31 @@ export const sendProposal = (id: string, message: string) => apiFetch<Proposal>(
 export const nudgeProposal = (id: string, message: string) => apiFetch<Proposal>(`/api/proposals/${id}/nudge`, jsonBody({ message }));
 export const deleteProposal = (id: string) => apiFetch<{ ok: boolean }>(`/api/proposals/${id}`, { method: 'DELETE' });
 export const proposalPreviewUrl = (id: string) => `${API_BASE}/api/proposals/${id}/preview`;
+
+// ── Invoices ─────────────────────────────────────────────────────────────────
+export interface InvoiceItem { text: string; qty: number; /** minor units */ rate: number }
+export interface Invoice {
+  id: string; dealId: string | null; proposalId: string | null; number: string; kind: 'deposit' | 'milestone' | 'final' | 'other'; part: number | null;
+  client: { name: string; email: string; address: string; taxId: string };
+  currency: Currency; items: InvoiceItem[]; gstPercent: number; subtotal: number; tax: number; total: number; note: string;
+  status: 'draft' | 'sent' | 'viewed' | 'paid' | 'void';
+  issuedAt: string | null; dueAt: string | null; paidAt: string | null; views: number; lastViewAt: string | null; remindersSent: string[];
+  link: string; reminder: string | null; overdue: boolean;
+  deal?: { id: string; name: string; client: string; stage: DealStage };
+  createdAt: string;
+}
+export type Money = Partial<Record<Currency, number>>;
+export const loadInvoices = (dealId?: string) => apiFetch<{ invoices: Invoice[]; waiting: Money; paidMonth: Money }>(`/api/invoices${dealId ? `?dealId=${dealId}` : ''}`);
+export const loadInvoice = (id: string) => apiFetch<Invoice>(`/api/invoices/${id}`);
+/** Items' `rate` in major units. */
+export const createInvoice = (body: { dealId?: string; client?: Partial<Invoice['client']>; currency?: Currency; items?: { text: string; qty: number; rate: number }[]; note?: string }) =>
+  apiFetch<Invoice>('/api/invoices', jsonBody(body));
+export const invoiceRest = (dealId: string) => apiFetch<{ made: Invoice[] }>(`/api/invoices/deal/${dealId}/rest`, { method: 'POST' });
+export const saveInvoice = (id: string, patch: { items?: { text: string; qty: number; rate: number }[]; client?: Partial<Invoice['client']>; note?: string; gstPercent?: number; dueAt?: string }) =>
+  apiFetch<Invoice>(`/api/invoices/${id}`, jsonBody(patch, 'PUT'));
+export const invoiceMessage = (id: string, kind: 'send' | 'remind') => apiFetch<{ text: string; to: string }>(`/api/invoices/${id}/message?kind=${kind}`);
+export const sendInvoice = (id: string, message: string) => apiFetch<Invoice>(`/api/invoices/${id}/send`, jsonBody({ message }));
+export const remindInvoice = (id: string, message: string) => apiFetch<Invoice>(`/api/invoices/${id}/remind`, jsonBody({ message }));
+export const markInvoicePaid = (id: string, paid: boolean) => apiFetch<Invoice & { dealPaid: boolean }>(`/api/invoices/${id}/paid`, jsonBody({ paid }));
+export const voidInvoice = (id: string) => apiFetch<Invoice>(`/api/invoices/${id}/void`, { method: 'POST' });
+export const invoicePreviewUrl = (id: string) => `${API_BASE}/api/invoices/${id}/preview`;

@@ -85,6 +85,14 @@ console.log('\nTriggers (funding news) are judged on the client, not keywords:')
 eq(judge(item('Acme raises $2M seed round to build AI bookkeeping', { source: 'news', sourceType: 'trigger' }), profile, NOW).verdict, 'keep', 'funding headline -> keep');
 eq(judge(item('Acme raises $2M seed round to build AI bookkeeping', { source: 'news', sourceType: 'trigger' }), profile, NOW).budget, null, 'a funding round is not a project budget');
 
+console.log('\nExclusions:');
+const unpaidProfile = { ...profile, exclusions: ['unpaid', 'wordpress'] };
+const u = (text) => judge(item(text), unpaidProfile, NOW);
+eq(u('Looking for a freelance React developer. 60 to 90 minutes, unpaid, take-home first. Budget ₹80,000').verdict, 'drop', '"unpaid" said of the work -> drop');
+eq(u('Looking for a freelance React developer, budget ₹80,000. We never ask for unpaid work.').verdict, 'keep', '"never ask for unpaid work" -> not excluded');
+eq(u('Looking for a freelance React developer for our Next.js app, budget ₹80,000 — no WordPress please').verdict, 'keep', '"no WordPress" -> not excluded');
+eq(u('Need a freelance developer to fix our WordPress site, budget ₹80,000').verdict, 'drop', 'a WordPress job -> excluded');
+
 console.log('\nParsing:');
 eq(parseBudget('budget ₹50,000').inr, 50000, '₹50,000');
 eq(parseBudget('Rs. 1.5 lakh').inr, 150000, 'Rs. 1.5 lakh');

@@ -15,7 +15,10 @@ const SIZES: [string, string][] = [['1-10', '1–10 people'], ['11-50', '11–50
 
 const EMPTY: ProfileData = {
   name: '', headline: '', portfolioUrl: '', howIWork: '', availability: '', phone: '', services: [], currency: 'INR', rate: 0, minProject: 0, clientTypes: [], companySizes: [],
-  locations: [], remoteOk: true, exclusions: [], proof: [], cases: [], sources: { hn: true, news: true, web: true, webPerDay: 5 },
+  locations: [], remoteOk: true, exclusions: [], proof: [], cases: [],
+  proposalTerms: { split: [30, 40, 30], rounds: 2, validDays: 14 },
+  billing: { legalName: '', address: '', taxId: '', gstPercent: 0, upiId: '', payDetails: '', prefix: 'INV', paymentDays: 7 },
+  sources: { hn: true, news: true, web: true, webPerDay: 5 },
 };
 
 function Card({ id, icon, title, sub, children }: { id?: string; icon: string; title: string; sub: string; children: ReactNode }) {
@@ -292,6 +295,67 @@ export default function Profile() {
                 <i className="ti ti-plus" /> Add a quote
               </button>
             )}
+          </Card>
+
+          <Card id="getting-paid" icon="ti-receipt" title="Proposals & getting paid" sub="What your proposals offer and what your invoices show. Payment is by UPI or your bank — no gateway, no fees.">
+            <div className="cl-cols">
+              <div className="form-group">
+                <label className="form-label" htmlFor="pf-split">Payment split (%)</label>
+                <input id="pf-split" type="text" value={(p.proposalTerms?.split || [30, 40, 30]).join(' / ')} placeholder="30 / 40 / 30"
+                  onChange={e => set('proposalTerms', { ...p.proposalTerms, split: e.target.value.split(/[^\d]+/).map(Number).filter(Boolean) })} />
+                <div className="cl-hint">To start / at the halfway demo / on delivery. Must add up to 100.</div>
+              </div>
+              <div className="form-group">
+                <label className="form-label" htmlFor="pf-rounds">Rounds of changes included</label>
+                <input id="pf-rounds" type="number" min={0} max={10} value={p.proposalTerms?.rounds ?? 2} onChange={e => set('proposalTerms', { ...p.proposalTerms, rounds: num(e.target.value) })} />
+              </div>
+              <div className="form-group">
+                <label className="form-label" htmlFor="pf-valid">Proposal open for (days)</label>
+                <input id="pf-valid" type="number" min={1} max={90} value={p.proposalTerms?.validDays ?? 14} onChange={e => set('proposalTerms', { ...p.proposalTerms, validDays: num(e.target.value) })} />
+              </div>
+            </div>
+            <div className="cl-cols">
+              <div className="form-group">
+                <label className="form-label" htmlFor="pf-upi">UPI ID</label>
+                <input id="pf-upi" type="text" value={p.billing?.upiId || ''} placeholder="yourname@okicici" onChange={e => set('billing', { ...p.billing, upiId: e.target.value.trim() })} />
+                <div className="cl-hint">Rupee invoices show a QR any UPI app can scan — the amount fills in by itself.</div>
+              </div>
+              <div className="form-group">
+                <label className="form-label" htmlFor="pf-legal">Name on invoices</label>
+                <input id="pf-legal" type="text" maxLength={160} value={p.billing?.legalName || ''} placeholder={p.name || 'Your full name or business name'} onChange={e => set('billing', { ...p.billing, legalName: e.target.value })} />
+              </div>
+            </div>
+            <div className="form-group">
+              <label className="form-label" htmlFor="pf-pay">Bank, PayPal or Wise details <span className="cl-row-sub">(for clients outside India, or as a second option)</span></label>
+              <textarea id="pf-pay" rows={3} maxLength={800} value={p.billing?.payDetails || ''} placeholder={'Bank: HDFC · A/c 50100… · IFSC HDFC0001234\nPayPal: you@example.com'} onChange={e => set('billing', { ...p.billing, payDetails: e.target.value })} />
+            </div>
+            <div className="cl-cols">
+              <div className="form-group">
+                <label className="form-label" htmlFor="pf-addr">Address on invoices (optional)</label>
+                <textarea id="pf-addr" rows={2} maxLength={500} value={p.billing?.address || ''} onChange={e => set('billing', { ...p.billing, address: e.target.value })} />
+              </div>
+              <div className="form-group">
+                <label className="form-label" htmlFor="pf-tax">PAN or GSTIN (optional)</label>
+                <input id="pf-tax" type="text" maxLength={40} value={p.billing?.taxId || ''} onChange={e => set('billing', { ...p.billing, taxId: e.target.value.toUpperCase() })} />
+              </div>
+            </div>
+            <div className="cl-cols">
+              <div className="form-group">
+                <label className="form-label" htmlFor="pf-gst">GST on rupee invoices</label>
+                <select id="pf-gst" value={String(p.billing?.gstPercent || 0)} onChange={e => set('billing', { ...p.billing, gstPercent: Number(e.target.value) })}>
+                  <option value="0">None — not registered (under ₹20 lakh a year)</option>
+                  {[5, 12, 18, 28].map(g => <option key={g} value={g}>{g}%</option>)}
+                </select>
+              </div>
+              <div className="form-group">
+                <label className="form-label" htmlFor="pf-days">Pay within (days)</label>
+                <input id="pf-days" type="number" min={0} max={90} value={p.billing?.paymentDays ?? 7} onChange={e => set('billing', { ...p.billing, paymentDays: num(e.target.value) })} />
+              </div>
+              <div className="form-group">
+                <label className="form-label" htmlFor="pf-prefix">Invoice number prefix</label>
+                <input id="pf-prefix" type="text" maxLength={12} value={p.billing?.prefix || 'INV'} onChange={e => set('billing', { ...p.billing, prefix: e.target.value })} />
+              </div>
+            </div>
           </Card>
 
           <div className="cl-savebar">

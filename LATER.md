@@ -25,6 +25,7 @@ Things decided or noticed but parked. Add to it as you go; move an item out when
 - **Funding news** — Google News links are redirects; resolving them to the real article would give a better "where" and sometimes the company's site.
 - **Parked sources** (leads plan §3): Gmail history, website audits (OpenStreetMap + PageSpeed), long-open developer roles, newly registered companies, agency partnerships.
 - **Let users add their own sources** — an RSS feed or a saved search (open question in the leads plan).
+- **Client posts straight from Reddit** — web search still finds Reddit posts second-hand. Reddit's own API on hiring subreddits (r/forhire, r/hiring, r/freelance_forhire, r/jobbit, r/remotejs, r/DoneDirtCheap), titles with [Hiring] or [Task], never [For Hire], would be fresher and free. Since 5 Nov 2026 web search keeps only actual post URLs and the AI is asked who wrote each post (`lib/sources/webPosts.js`, `lib/leads/readPosts.js`); see whether that is enough first.
 
 ## Setup and profile
 
@@ -41,7 +42,6 @@ Things decided or noticed but parked. Add to it as you go; move an item out when
 
 ## Outreach and Inbox
 
-- **Deals and "Start a deal"** from an Inbox reply (wants a quote / a call); a lead in an open deal skips sequences.
 - **Today page** — replies waiting on you, follow-ups due, tasks, Gmail sends today.
 - **A/B subject lines** per sequence, and per-template reply rates.
 - **Send windows and warm-up** — only send on weekday mornings in the lead's time zone; ramp a new Gmail up slowly.
@@ -58,3 +58,14 @@ Today, Deals, Proposals, Invoices, Project boards (see `claudemd/clientline-prot
 - **Rate limits** — `POST /api/sources/run` and paste have no per-user rate limit beyond "one run at a time".
 
 - **Which first emails win** — every first email now records `SentEmail.meta` (shape asked/event, the project cited, word count, edited or not). Show reply rate by shape and by project on the sequence card once there are ~30 sends, and tell the user which project gets the most replies.
+
+## Deals, proposals, invoices
+
+- **Tell me when it happens** — no email or bell yet when a client opens or accepts a proposal, or opens an invoice; you see it on Deals / Proposals / Invoices. A short email to yourself (Resend, already set up for sign-in codes) on accept would be the first one.
+- **Money bar on Today** — waiting / overdue / paid this month, once Today exists (Invoices shows it now).
+- **PDF invoices** — today the page prints to PDF from the browser; a real PDF attachment (pdfkit, as Outreach's lib/reportPdf.js) if clients ask.
+- **Payment gateway** (Razorpay / Stripe links) for card payments — UPI QR and bank details cover India for free today.
+- **Automatic reminders** — reminders are suggested and sent by you (manual-first); automate with Inngest later.
+- **Client "decline" with a reason** on the proposal page, and per-deal "Lost" reasons on a chart.
+- **Proposal versions** — editing a sent proposal changes the live page (accepting is refused if it changed since it loaded); keep each sent version.
+
