@@ -26,12 +26,14 @@ function cleanSteps(raw) {
     dayOffset: Math.max(0, Math.min(60, Math.round(Number(s && s.dayOffset) || 0))),
     subject: String((s && s.subject) || '').replace(/\s+/g, ' ').trim().slice(0, 160),
     body: String((s && s.body) || '').replace(/\r\n?/g, '\n').trim().slice(0, 4000),
+    // Only the first step can send each lead's own email.
+    useLeadEmail: i === 0 && !!(s && s.useLeadEmail),
   }));
   if (!steps.length) return { error: 'A sequence needs at least one email.' };
   steps[0].dayOffset = 0;
-  if (!steps[0].subject) return { error: 'The first email needs a subject.' };
+  if (!steps[0].useLeadEmail && !steps[0].subject) return { error: 'The first email needs a subject.' };
   for (let i = 0; i < steps.length; i++) {
-    if (!steps[i].body) return { error: `Step ${i + 1} is empty.` };
+    if (!steps[i].body && !steps[i].useLeadEmail) return { error: `Step ${i + 1} is empty.` };
     if (i > 0 && steps[i].dayOffset <= steps[i - 1].dayOffset) return { error: `Step ${i + 1} must come at least a day after step ${i}.` };
     const { unknown } = variablesIn(`${steps[i].subject}\n${steps[i].body}`);
     if (unknown.length) return { error: `Step ${i + 1} uses ${unknown.map(k => `{{${k}}}`).join(', ')}, which isn't a variable.` };
@@ -69,9 +71,13 @@ async function statsFor(userId, ids) {
   return out;
 }
 
+// The old ready-made first step: a template around {{opener}}. Such a sequence can
+// switch to the new "First contact" (each lead's own email) with one press.
+const isOldStarter = (s) => !!(s.steps && s.steps[0] && !s.steps[0].useLeadEmail && /\{\{\s*opener\s*\}\}/.test(s.steps[0].body || '') && /\{\{\s*myHeadline\s*\}\}/.test(s.steps[0].body || ''));
+
 const view = (s, stats) => ({
   id: String(s._id), name: s.name, active: s.active, newPerDay: s.newPerDay, steps: s.steps,
-  createdAt: s.createdAt, stats: stats || null,
+  createdAt: s.createdAt, stats: stats || null, canUpgrade: isOldStarter(s),
 });
 
 router.get('/sequences', async (req, res) => {
@@ -101,6 +107,20 @@ router.post('/sequences', async (req, res) => {
     const name = String((req.body && req.body.name) || '').trim().slice(0, 80) || `Sequence ${count + 1}`;
     const seq = await Sequence.create({ userId: req.userId, name, active: false, steps: STARTER.steps });
     res.status(201).json(view(seq.toObject()));
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+/** Swap an old ready-made sequence's steps for the new "First contact". Only when asked. */
+router.post('/sequences/:id/upgrade', async (req, res) => {
+  if (!validId(req.params.id)) return res.status(404).json({ error: 'No such sequence' });
+  try {
+    const seq = await Sequence.findOne({ _id: req.params.id, userId: req.userId }).lean();
+    if (!seq) return res.status(404).json({ error: 'No such sequence' });
+    if (!isOldStarter(seq)) return res.status(400).json({ error: 'This sequence has already been changed — edit it instead.' });
+    const updated = await Sequence.findOneAndUpdate({ _id: seq._id, userId: req.userId }, { $set: { steps: STARTER.steps } }, { returnDocument: 'after' }).lean();
+    res.json(view(updated));
   } catch (err) {
     res.status(500).json({ error: err.message });
   }

@@ -13,13 +13,13 @@ const CLIENT_TYPES: [string, string][] = [
 const SIZES: [string, string][] = [['1-10', '1–10 people'], ['11-50', '11–50'], ['51-200', '51–200'], ['200+', '200+']];
 
 const EMPTY: ProfileData = {
-  name: '', headline: '', services: [], currency: 'INR', rate: 0, minProject: 0, clientTypes: [], companySizes: [],
+  name: '', headline: '', portfolioUrl: '', howIWork: '', availability: '', services: [], currency: 'INR', rate: 0, minProject: 0, clientTypes: [], companySizes: [],
   locations: [], remoteOk: true, exclusions: [], proof: [], cases: [], sources: { hn: true, news: true, web: true, webPerDay: 5 },
 };
 
-function Card({ icon, title, sub, children }: { icon: string; title: string; sub: string; children: ReactNode }) {
+function Card({ id, icon, title, sub, children }: { id?: string; icon: string; title: string; sub: string; children: ReactNode }) {
   return (
-    <div className="s-card" style={{ marginBottom: 16 }}>
+    <div className="s-card" id={id} style={{ marginBottom: 16 }}>
       <div className="s-head">
         <div className="s-head-left">
           <div className="s-icon"><i className={`ti ${icon}`} /></div>
@@ -28,6 +28,31 @@ function Card({ icon, title, sub, children }: { icon: string; title: string; sub
       </div>
       <div className="s-body">{children}</div>
     </div>
+  );
+}
+
+/** What your first emails can draw on, and what's missing (mirrors emailStrength in lib/outreach/firstEmail.js). */
+function EmailStrength({ p }: { p: ProfileData }) {
+  const covered = new Set(p.cases.filter(c => c.title && c.result).map(c => c.service).filter(Boolean));
+  const items: { ok: boolean; label: string; href: string }[] = [
+    { ok: !!p.name.trim(), label: 'Your name', href: '#about' },
+    { ok: !!p.headline.trim(), label: 'One line about you', href: '#about' },
+    { ok: !!p.portfolioUrl.trim(), label: 'A portfolio or website link', href: '#about' },
+    ...p.services.map(s => ({ ok: covered.has(s.name), label: `A project for “${s.name}”`, href: '#work' })),
+  ];
+  const done = items.filter(i => i.ok).length;
+  if (!items.length) return null;
+  return (
+    <Card icon="ti-mail-check" title={`Email strength · ${done} of ${items.length}`}
+      sub="Your first email cites the project that matches what the lead needs. Without one, it goes without proof — never made up.">
+      <div className="cl-toggles" style={{ flexWrap: 'wrap' }}>
+        {items.map(i => (
+          <a key={i.label} href={i.href} className="cl-toggle" aria-pressed={i.ok} style={{ textDecoration: 'none' }}>
+            <i className={`ti ${i.ok ? 'ti-check' : 'ti-plus'}`} /> {i.label}
+          </a>
+        ))}
+      </div>
+    </Card>
   );
 }
 
@@ -100,7 +125,9 @@ export default function Profile() {
             </div>
           )}
 
-          <Card icon="ti-user" title="About you" sub="How a first line introduces you">
+          <EmailStrength p={p} />
+
+          <Card id="about" icon="ti-user" title="About you" sub="How your first email introduces you and signs off">
             <div className="cl-cols">
               <div className="form-group">
                 <label className="form-label" htmlFor="pf-name">Your name</label>
@@ -111,6 +138,25 @@ export default function Profile() {
                 <input id="pf-headline" type="text" value={p.headline} maxLength={140} placeholder="Freelance React and Node developer"
                   onChange={e => set('headline', e.target.value)} />
               </div>
+            </div>
+            <div className="cl-cols">
+              <div className="form-group">
+                <label className="form-label" htmlFor="pf-portfolio">Portfolio or website</label>
+                <input id="pf-portfolio" type="url" value={p.portfolioUrl} maxLength={300} placeholder="https://yourname.dev"
+                  onChange={e => set('portfolioUrl', e.target.value)} />
+                <div className="cl-hint">The one link in your email when a piece of work has none of its own.</div>
+              </div>
+              <div className="form-group">
+                <label className="form-label" htmlFor="pf-avail">When you can start <span className="cl-row-sub">(optional)</span></label>
+                <input id="pf-avail" type="text" value={p.availability} maxLength={80} placeholder="I can start next week"
+                  onChange={e => set('availability', e.target.value)} />
+              </div>
+            </div>
+            <div className="form-group">
+              <label className="form-label" htmlFor="pf-how">How you work <span className="cl-row-sub">(optional)</span></label>
+              <input id="pf-how" type="text" value={p.howIWork} maxLength={160} placeholder="Fixed price after a short call, a demo every week"
+                onChange={e => set('howIWork', e.target.value)} />
+              <div className="cl-hint">The email may use this when it says how you’d start on their project.</div>
             </div>
           </Card>
 
@@ -187,8 +233,8 @@ export default function Profile() {
               suggestions={EXCLUSION_OPTIONS} onChange={v => set('exclusions', v)} />
           </Card>
 
-          <Card icon="ti-award" title="Proof" sub="The only results and quotes a first line may mention">
-            <div className="form-label" style={{ marginBottom: 8 }}>Results you can point to</div>
+          <Card id="work" icon="ti-award" title="Your work" sub="Each first email cites the piece that matches the lead’s service, with its link — and only what you write here">
+            <div className="form-label" style={{ marginBottom: 8 }}>Projects with a result</div>
             {p.cases.map((c, i) => (
               <div className="cl-row" key={i}>
                 <button type="button" className="btn btn-xs cl-row-remove" aria-label="Remove result"
@@ -201,11 +247,21 @@ export default function Profile() {
                 </div>
                 <input type="text" aria-label="Result" placeholder="Mobile score went from 34 to 92" value={c.result} maxLength={300}
                   onChange={e => set('cases', p.cases.map((x, n) => (n === i ? { ...x, result: e.target.value } : x)))} />
+                <div className="cl-cols" style={{ marginTop: 8 }}>
+                  <select aria-label="Which service it proves" value={c.service || ''}
+                    onChange={e => set('cases', p.cases.map((x, n) => (n === i ? { ...x, service: e.target.value } : x)))}>
+                    <option value="">Which service does it prove?</option>
+                    {p.services.map(s => <option key={s.name} value={s.name}>{s.name}</option>)}
+                  </select>
+                  <input type="text" aria-label="Kind of client (optional)" placeholder="For a… D2C brand (optional)" value={c.client || ''} maxLength={80}
+                    onChange={e => set('cases', p.cases.map((x, n) => (n === i ? { ...x, client: e.target.value } : x)))} />
+                </div>
               </div>
             ))}
             {p.cases.length < 10 && (
-              <button type="button" className="btn" style={{ marginBottom: 18 }} onClick={() => set('cases', [...p.cases, { title: '', result: '', url: '' }])}>
-                <i className="ti ti-plus" /> Add a result
+              <button type="button" className="btn" style={{ marginBottom: 18 }}
+                onClick={() => set('cases', [...p.cases, { title: '', result: '', url: '', service: p.services.find(s => !p.cases.some(c => c.service === s.name))?.name || '', client: '' }])}>
+                <i className="ti ti-plus" /> Add a project
               </button>
             )}
             <div className="form-label" style={{ marginBottom: 8 }}>What clients said</div>

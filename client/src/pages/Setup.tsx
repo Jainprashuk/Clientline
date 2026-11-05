@@ -30,6 +30,11 @@ export default function Setup() {
   const [locations, setLocations] = useState<string[]>([home.location]);
   const [remoteOk, setRemoteOk] = useState(true);
   const [saving, setSaving] = useState(false);
+  // Step 4, "Your intro": how the first email signs off, and one project it can cite.
+  const [name, setName] = useState('');
+  const [headline, setHeadline] = useState('');
+  const [portfolioUrl, setPortfolioUrl] = useState('');
+  const [work, setWork] = useState({ title: '', result: '', url: '', service: '' });
 
   useEffect(() => {
     loadProfile().then(v => {
@@ -40,6 +45,7 @@ export default function Setup() {
       if (p.locations.length) setLocations(p.locations);
       if (p.currency) setCurrency(p.currency);
       setRemoteOk(p.remoteOk !== false);
+      setName(p.name || ''); setHeadline(p.headline || ''); setPortfolioUrl(p.portfolioUrl || '');
     }).catch(e => toast(e.message, 'error'));
   }, [toast]);
 
@@ -53,6 +59,8 @@ export default function Setup() {
   const step1ok = services.length > 0;
   const step2ok = minProject > 0;
   const step3ok = locations.length > 0 || remoteOk;
+  const step4ok = !!name.trim() && !!headline.trim();
+  const LAST = 3;
   const sliderMax = inCurrency(300000, currency);
 
   const finish = async () => {
@@ -63,7 +71,10 @@ export default function Setup() {
     const words = new Set(services.flatMap(s => s.keywords));
     const exclusions = [...new Set([...base.exclusions, 'unpaid', 'equity only', ...picked.flatMap(p => p.exclusions)])].filter(x => !words.has(x));
     try {
+      const cases = work.title.trim() && work.result.trim()
+        ? [...base.cases, { ...work, service: work.service || services[0]?.name || '', client: '' }] : base.cases;
       const v = await saveProfile({ ...base, services, currency, minProject, locations, remoteOk, exclusions,
+        name: name.trim(), headline: headline.trim(), portfolioUrl: portfolioUrl.trim(), cases,
         clientTypes: base.clientTypes.length ? base.clientTypes : ['startups'] });
       if (!v.complete) { toast(`Still needed: ${v.missing.join(', ')}`, 'error'); return; }
       toast('Saved. Finding your first leads…', 'success');
@@ -74,9 +85,9 @@ export default function Setup() {
   };
 
   return (
-    <Layout title="Set up" subtitle="Three quick questions, then your first leads. You can fine-tune everything later in My profile.">
+    <Layout title="Set up" subtitle="Four quick questions, then your first leads. You can fine-tune everything later in My profile.">
       <div className="cl-setup">
-        <div className="cl-steps" aria-hidden="true">{[0, 1, 2].map(i => <span key={i} className={i <= step ? 'on' : ''} />)}</div>
+        <div className="cl-steps" aria-hidden="true">{[0, 1, 2, 3].map(i => <span key={i} className={i <= step ? 'on' : ''} />)}</div>
 
         {step === 0 && (
           <div className="s-card"><div className="s-body">
@@ -120,14 +131,46 @@ export default function Setup() {
           </div></div>
         )}
 
+        {step === 3 && (
+          <div className="s-card"><div className="s-body">
+            <h2>Your intro</h2>
+            <p className="lead">Each lead gets its own first email: what they need, one project of yours that matches, how you’d start, and an offer to send a short plan. This is what it signs with and the work it can point to.</p>
+            <div className="cl-cols">
+              <div className="form-group">
+                <label className="form-label" htmlFor="su-name">Your name</label>
+                <input id="su-name" type="text" value={name} maxLength={80} onChange={e => setName(e.target.value)} />
+              </div>
+              <div className="form-group">
+                <label className="form-label" htmlFor="su-headline">One line about you</label>
+                <input id="su-headline" type="text" value={headline} maxLength={140} placeholder="Freelance React and Node developer" onChange={e => setHeadline(e.target.value)} />
+              </div>
+            </div>
+            <div className="form-group">
+              <label className="form-label" htmlFor="su-portfolio">Portfolio or website <span className="cl-row-sub">(optional)</span></label>
+              <input id="su-portfolio" type="url" value={portfolioUrl} maxLength={300} placeholder="https://yourname.dev" onChange={e => setPortfolioUrl(e.target.value)} />
+            </div>
+            <div className="form-label" style={{ margin: '14px 0 6px' }}>One project with a result <span className="cl-row-sub">(optional — emails that show real work get more replies)</span></div>
+            <div className="cl-cols">
+              <input type="text" aria-label="Project" placeholder="Checkout rebuild for a D2C brand" value={work.title} maxLength={120} onChange={e => setWork(w => ({ ...w, title: e.target.value }))} />
+              <select aria-label="Which service it proves" value={work.service} onChange={e => setWork(w => ({ ...w, service: e.target.value }))}>
+                <option value="">Which service?</option>
+                {services.map(s => <option key={s.name} value={s.name}>{s.name}</option>)}
+              </select>
+            </div>
+            <input type="text" aria-label="Result" style={{ marginTop: 8 }} placeholder="Mobile conversion up 18% in the first month" value={work.result} maxLength={300} onChange={e => setWork(w => ({ ...w, result: e.target.value }))} />
+            <input type="url" aria-label="Link (optional)" style={{ marginTop: 8 }} placeholder="https://… (optional)" value={work.url} maxLength={300} onChange={e => setWork(w => ({ ...w, url: e.target.value }))} />
+            <div className="cl-hint">Only what you write here is ever mentioned. Real numbers only.</div>
+          </div></div>
+        )}
+
         <div className="cl-setup-foot">
           {step > 0 ? <button className="btn" type="button" onClick={() => setStep(s => s - 1)}><i className="ti ti-arrow-left" /> Back</button> : <span />}
-          {step < 2 ? (
-            <button className="btn btn-primary" type="button" disabled={step === 0 ? !step1ok : !step2ok} onClick={() => setStep(s => s + 1)}>
+          {step < LAST ? (
+            <button className="btn btn-primary" type="button" disabled={[!step1ok, !step2ok, !step3ok][step]} onClick={() => setStep(s => s + 1)}>
               Next <i className="ti ti-arrow-right" />
             </button>
           ) : (
-            <button className="btn btn-primary" type="button" disabled={!step3ok || saving || !base} onClick={finish}>
+            <button className="btn btn-primary" type="button" disabled={!step4ok || saving || !base} onClick={finish}>
               {saving ? <><i className="ti ti-loader" /> Saving…</> : <>Find my first leads <i className="ti ti-arrow-right" /></>}
             </button>
           )}

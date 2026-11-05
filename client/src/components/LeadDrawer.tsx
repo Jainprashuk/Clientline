@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import Drawer from './Drawer';
 import AddToSequence from './AddToSequence';
+import FirstEmailCard from './FirstEmailCard';
 import { useToast } from '../context/ToastContext';
 import {
   loadLead, saveOpener, approveLead, discardLead, restoreLead, writeLeadOpener, loadLeadEnrollment, stopLeads,
@@ -40,10 +41,14 @@ export default function LeadDrawer({ id, onClose, onChanged }: {
     loadLead(id).then(l => { setLead(l); setOpener(l.opener || ''); }).catch(e => setError(e.message));
   }, [id]);
 
+  // Decisions and edits answer without emailHelp; keep the one we have.
+  const keepHelp = (l: Lead): Lead => ({ ...l, emailHelp: l.emailHelp || lead?.emailHelp });
+  const onEmail = (l: Lead) => { const m = keepHelp(l); setLead(m); onChanged(m); };
+
   const act = async (fn: () => Promise<Lead>, done: string) => {
     setBusy(true);
     try {
-      const l = await fn();
+      const l = keepHelp(await fn());
       setLead(l); setOpener(l.opener || ''); onChanged(l);
       toast(done, 'success');
     } catch (e: any) { toast(e.message, 'error'); }
@@ -200,8 +205,11 @@ export default function LeadDrawer({ id, onClose, onChanged }: {
             )}
           </div>
 
-          <div className="cl-sect">
-            <h3>Suggested first line</h3>
+          <FirstEmailCard lead={lead} disabled={busy} onLead={onEmail} />
+
+          {/* Only your own sequences use {{opener}}; the ready-made one sends the email above. */}
+          <details className="cl-sect" open={!!lead.opener && !lead.firstEmail}>
+            <summary className="cl-row-sub" style={{ cursor: 'pointer' }}>First line only — for your own sequences that use {'{{opener}}'}</summary>
             <textarea className="cl-opener" aria-label="First line" maxLength={600} value={opener} disabled={writing}
               placeholder={writing ? 'Writing from the facts above…' : 'Write the first line of your email, or let AI draft one from the facts above.'}
               onChange={e => setOpener(e.target.value)} />
@@ -222,7 +230,7 @@ export default function LeadDrawer({ id, onClose, onChanged }: {
                   onClick={() => act(() => saveOpener(lead.id, opener), 'First line saved.')}>Save line</button>
               )}
             </div>
-          </div>
+          </details>
         </>
       )}
     </Drawer>

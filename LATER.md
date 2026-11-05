@@ -56,3 +56,5 @@ Today, Deals, Proposals, Invoices, Project boards (see `claudemd/clientline-prot
 - **Tests** — add `scripts/test-tenant.js` (user B can't read or change user A's leads, profile or keys) and a LeadShare test (the 4th account is refused).
 - **AI call log** — rows are kept 30 days; nothing shows them yet. An admin view would help debug first lines.
 - **Rate limits** — `POST /api/sources/run` and paste have no per-user rate limit beyond "one run at a time".
+
+- **Which first emails win** — every first email now records `SentEmail.meta` (shape asked/event, the project cited, word count, edited or not). Show reply rate by shape and by project on the sequence card once there are ~30 sends, and tell the user which project gets the most replies.

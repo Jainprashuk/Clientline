@@ -107,6 +107,19 @@ export default function SequenceEditor({ seq, variables, onClose, onSaved, onDel
             )}
           </div>
           {i === 0 && (
+            <label className="cl-meta" style={{ cursor: 'pointer' }}>
+              <input type="checkbox" checked={!!s.useLeadEmail}
+                onChange={e => set(i, e.target.checked ? { useLeadEmail: true } : { useLeadEmail: false, subject: s.subject || 'Quick idea for {{company}}', body: s.body || 'Hi {{first}},\n\n{{opener}}\n\n{{myName}}' })} />
+              Send each lead’s own first email (written for them, checked by you in the lead)
+            </label>
+          )}
+          {i === 0 && s.useLeadEmail ? (
+            <div className="cl-hint" style={{ marginTop: 4 }}>
+              Every lead gets a different email: what they need, one project of yours that matches, how you’d start, and an offer to send a short plan.
+              You see and can edit each one in the lead before adding it here.
+            </div>
+          ) : <>
+          {i === 0 && (
             <input type="text" aria-label="Subject" maxLength={160} placeholder="Subject" value={s.subject}
               ref={el => { refs.current[`${i}-subject`] = el; }} onFocus={() => setFocus({ i, field: 'subject' })}
               onChange={e => set(i, { subject: e.target.value })} />
@@ -115,6 +128,7 @@ export default function SequenceEditor({ seq, variables, onClose, onSaved, onDel
             placeholder={s.kind === 'task' ? 'e.g. Connect with them on LinkedIn' : ''} value={s.body}
             ref={el => { refs.current[`${i}-body`] = el; }} onFocus={() => setFocus({ i, field: 'body' })}
             onChange={e => set(i, { body: e.target.value })} />
+          </>}
           {preview && preview.steps[i] && (
             preview.steps[i].ok
               ? <div className="cl-signal"><div className="src" style={{ marginBottom: 4 }}>For {preview.lead}{preview.steps[i].subject ? ` · subject: ${preview.steps[i].subject}` : ''}</div><div style={{ whiteSpace: 'pre-wrap', fontSize: 13 }}>{preview.steps[i].body}</div></div>

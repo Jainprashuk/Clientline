@@ -10,6 +10,9 @@ const mongoose = require('mongoose');
 const Lead = require('../models/Lead');
 const { WEAK } = require('../lib/leads/score');
 const { writeOpener } = require('../lib/leads/opener');
+const { writeFirstEmail, emailStrength } = require('../lib/outreach/firstEmail');
+const { rankCases } = require('../lib/outreach/cases');
+const Profile = require('../models/Profile');
 const Enrollment = require('../models/Enrollment');
 const Sequence = require('../models/Sequence');
 
@@ -22,7 +25,7 @@ const validId = (id) => mongoose.isValidObjectId(id);
 
 const LIST_FIELDS = {
   name: 1, person: 1, title: 1, email: 1, emailConfidence: 1, source: 1, sourceType: 1, where: 1, postedAt: 1,
-  fit: 1, fitWhy: 1, status: 1, heldReason: 1, discardReason: 1, service: 1, createdAt: 1, opener: 1, openerState: 1,
+  fit: 1, fitWhy: 1, status: 1, heldReason: 1, discardReason: 1, service: 1, createdAt: 1, opener: 1, openerState: 1, 'firstEmail.state': 1,
   signals: { $slice: 1 },
 };
 
@@ -80,21 +83,50 @@ router.get('/:id', async (req, res) => {
   try {
     const lead = await Lead.findOne({ _id: req.params.id, userId: req.userId }).lean();
     if (!lead) return res.status(404).json({ error: 'No such lead' });
-    res.json(shape(lead));
+    res.json({ ...shape(lead), emailHelp: await emailHelp(req.userId, lead) });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
 });
 
-/** The user's own edit of the first line. Their words, so no validator. */
+/**
+ * For the drawer's First email: the work it could cite (best match first, then the
+ * rest), and what would make it stronger.
+ */
+async function emailHelp(userId, lead) {
+  const profile = (await Profile.findOne({ userId }).lean()) || {};
+  const ranked = rankCases(profile, lead).map(c => c.title);
+  const rest = (profile.cases || []).map(c => c.title).filter(t => !ranked.includes(t));
+  return {
+    cases: [...ranked, ...rest],
+    matching: ranked.length,
+    // No work for this lead's service: the email goes without proof.
+    missingCaseFor: lead.service && !ranked.length ? lead.service : null,
+    strength: emailStrength(profile).filter(x => !x.ok && !x.key.startsWith('case:')).map(x => x.label),
+  };
+}
+
+/** The user's own edit of the first line or the first email. Their words, so no validator. */
 router.patch('/:id', async (req, res) => {
   if (!validId(req.params.id)) return res.status(404).json({ error: 'No such lead' });
-  const opener = typeof (req.body && req.body.opener) === 'string' ? req.body.opener.replace(/\s+/g, ' ').trim().slice(0, 600) : null;
-  if (opener === null) return res.status(400).json({ error: 'Nothing to change' });
+  const body = req.body || {};
+  const $set = {};
+  if (typeof body.opener === 'string') {
+    const opener = body.opener.replace(/\s+/g, ' ').trim().slice(0, 600);
+    Object.assign($set, { opener, openerState: opener ? 'edited' : 'none', openerError: null });
+  }
+  if (body.firstEmail && typeof body.firstEmail === 'object') {
+    const subject = String(body.firstEmail.subject || '').replace(/\s+/g, ' ').trim().slice(0, 160);
+    const text = String(body.firstEmail.body || '').replace(/\r\n?/g, '\n').trim().slice(0, 4000);
+    if (!subject || !text) return res.status(400).json({ error: 'The email needs a subject and a body.' });
+    if (/\{\{|\}\}/.test(`${subject}${text}`)) return res.status(400).json({ error: 'Remove the {{ }} — this email is sent as written.' });
+    Object.assign($set, { 'firstEmail.subject': subject, 'firstEmail.body': text, 'firstEmail.state': 'edited', 'firstEmail.error': null });
+  }
+  if (!Object.keys($set).length) return res.status(400).json({ error: 'Nothing to change' });
   try {
     const lead = await Lead.findOneAndUpdate(
       { _id: req.params.id, userId: req.userId },
-      { $set: { opener, openerState: opener ? 'edited' : 'none', openerError: null } },
+      { $set },
       { returnDocument: 'after' },
     ).lean();
     if (!lead) return res.status(404).json({ error: 'No such lead' });
@@ -147,6 +179,20 @@ router.post('/:id/opener', async (req, res) => {
     if (!r.lead) return res.status(404).json({ error: 'No such lead' });
     if (r.noKeys) return res.status(400).json({ error: r.error, code: 'AI_KEY_REQUIRED' });
     res.json({ ...shape(r.lead), ok: r.ok, writeError: r.ok ? null : r.error });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+/** Write (or rewrite) the whole first email now. `useCase`: cite this piece of work instead. */
+router.post('/:id/first-email', async (req, res) => {
+  if (!validId(req.params.id)) return res.status(404).json({ error: 'No such lead' });
+  const useCase = typeof (req.body && req.body.useCase) === 'string' ? req.body.useCase.slice(0, 120) : null;
+  try {
+    const r = await writeFirstEmail(req.userId, req.params.id, { useCase });
+    if (!r.lead) return res.status(404).json({ error: 'No such lead' });
+    if (r.noKeys) return res.status(400).json({ error: r.error, code: 'AI_KEY_REQUIRED' });
+    res.json({ ...shape(r.lead), emailHelp: await emailHelp(req.userId, r.lead), ok: r.ok, writeError: r.ok ? null : r.error });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }

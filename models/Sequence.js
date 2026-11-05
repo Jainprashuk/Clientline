@@ -13,6 +13,8 @@ const stepSchema = new mongoose.Schema({
   dayOffset: { type: Number, default: 0, min: 0, max: 60 },
   subject: { type: String, default: '', maxlength: 160 },
   body: { type: String, default: '', maxlength: 4000 },
+  // Step 1 only: send each lead's own first email (Lead.firstEmail) instead of subject/body.
+  useLeadEmail: { type: Boolean, default: false },
 }, { _id: false });
 
 const sequenceSchema = new mongoose.Schema({

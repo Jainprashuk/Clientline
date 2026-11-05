@@ -17,7 +17,7 @@ const Lead = require('../models/Lead');
 const RunItem = require('../models/RunItem');
 const { importItems, buildLead } = require('../lib/leads/import');
 const { judge } = require('../lib/leads/gates');
-const { writeOpenersFor } = require('../lib/leads/opener');
+const { writeFirstEmailsFor } = require('../lib/outreach/firstEmail');
 const { aiReady } = require('../lib/ai/keys');
 
 const router = express.Router();
@@ -189,7 +189,7 @@ router.post('/paste/import', async (req, res) => {
       const r = await importItems(req.userId, items, profile, { runId: run._id, aiRead: true });
       r.read = messages;
       await record(run._id, r, { unit: true });
-      await writeOpenersFor(req.userId, r.leadIds, { max: 5, deadline: Date.now() + 30_000 }).catch(() => {});
+      await writeFirstEmailsFor(req.userId, r.leadIds, { max: 5, deadline: Date.now() + 30_000 }).catch(() => {});
       res.json({ run: runView(await finishRun(run._id, { worked: true })) });
     } catch (err) {
       await finishRun(run._id, { error: err.message });

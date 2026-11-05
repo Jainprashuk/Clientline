@@ -66,6 +66,9 @@ export interface Service { name: string; keywords: string[]; minBudget: number }
 export interface Profile {
   name: string;
   headline: string;
+  portfolioUrl: string;
+  howIWork: string;
+  availability: string;
   services: Service[];
   currency: 'INR' | 'USD' | 'EUR' | 'GBP';
   rate: number;
@@ -76,9 +79,11 @@ export interface Profile {
   remoteOk: boolean;
   exclusions: string[];
   proof: { who: string; text: string }[];
-  cases: { title: string; result: string; url: string }[];
+  cases: ProfileCase[];
   sources: { hn: boolean; news: boolean; web: boolean; webPerDay: number };
 }
+/** A piece of past work; `service` is which of your services it proves. */
+export interface ProfileCase { title: string; result: string; url: string; service: string; client: string }
 export interface ProfileView { profile: Profile; complete: boolean; missing: string[] }
 
 export const loadProfile = () => apiFetch<ProfileView>('/api/profile');
@@ -112,6 +117,9 @@ export interface Lead {
   openerSources?: string[];
   openerState: 'none' | 'written' | 'edited' | 'failed' | 'skipped';
   openerError?: string | null;
+  firstEmail?: FirstEmail | null;
+  /** Lead detail only: the work the first email could cite, and what would make it stronger. */
+  emailHelp?: EmailHelp;
   status: LeadStatus;
   /** On In outreach / Replied lists: where the lead is in its sequence. */
   outreach?: { sequence: string; step: number; steps: number; nextAt: string; status: string; stopReason: string | null };
@@ -119,6 +127,11 @@ export interface Lead {
   discardReason: DiscardReason | null;
   createdAt: string;
 }
+export interface FirstEmail {
+  subject: string; body: string; shape: 'asked' | 'event' | null; caseTitle: string | null; link: string | null;
+  sources: string[]; state: 'written' | 'edited' | 'failed'; error: string | null; at: string | null;
+}
+export interface EmailHelp { cases: string[]; matching: number; missingCaseFor: string | null; strength: string[] }
 export interface LeadList {
   leads: Lead[];
   total: number; page: number; limit: number; pages: number;
@@ -136,6 +149,9 @@ export function loadLeads(q: LeadQuery) {
 }
 export const loadLead = (id: string) => apiFetch<Lead>(`/api/leads/${id}`);
 export const saveOpener = (id: string, opener: string) => apiFetch<Lead>(`/api/leads/${id}`, jsonBody({ opener }, 'PATCH'));
+export const saveFirstEmail = (id: string, firstEmail: { subject: string; body: string }) => apiFetch<Lead>(`/api/leads/${id}`, jsonBody({ firstEmail }, 'PATCH'));
+export const writeFirstEmail = (id: string, useCase?: string) =>
+  apiFetch<Lead & { ok: boolean; writeError: string | null }>(`/api/leads/${id}/first-email`, jsonBody({ useCase: useCase || null }));
 export const writeLeadOpener = (id: string) => apiFetch<Lead & { ok: boolean; writeError: string | null }>(`/api/leads/${id}/opener`, { method: 'POST' });
 export const approveLead = (id: string) => apiFetch<Lead>(`/api/leads/${id}/approve`, { method: 'POST' });
 export const restoreLead = (id: string) => apiFetch<Lead>(`/api/leads/${id}/restore`, { method: 'POST' });
@@ -185,16 +201,17 @@ export function loadRunItems(runId: string, q: { outcome?: RunOutcome | ''; reas
 export const addRunItem = (id: string) => apiFetch<{ ok: boolean; leadId: string; status: LeadStatus; already: boolean }>(`/api/sources/items/${id}/add`, { method: 'POST' });
 
 // ── Outreach: sequences ──────────────────────────────────────────────────────
-export interface SeqStep { kind: 'email' | 'task'; dayOffset: number; subject: string; body: string }
+export interface SeqStep { kind: 'email' | 'task'; dayOffset: number; subject: string; body: string; useLeadEmail?: boolean }
 export interface SeqStats {
   people: number; active: number; done: number; replied: number; bounced: number; unsubscribed: number;
   sent: Record<string, number>; repliedAt: Record<string, number>;
 }
-export interface Sequence { id: string; name: string; active: boolean; newPerDay: number; steps: SeqStep[]; stats: SeqStats | null }
+export interface Sequence { id: string; name: string; active: boolean; newPerDay: number; steps: SeqStep[]; stats: SeqStats | null; canUpgrade?: boolean }
 export interface Variable { key: string; label: string }
 export interface StepPreview { ok: boolean; subject?: string | null; body?: string; why?: string }
 
 export const loadSequences = () => apiFetch<{ sequences: Sequence[]; variables: Variable[]; missingYours: (Variable & { where: string })[] }>('/api/outreach/sequences');
+export const upgradeSequence = (id: string) => apiFetch<Sequence>(`/api/outreach/sequences/${id}/upgrade`, { method: 'POST' });
 export const createSequence = (name: string) => apiFetch<Sequence>('/api/outreach/sequences', jsonBody({ name }));
 export const updateSequence = (id: string, patch: Partial<Pick<Sequence, 'name' | 'active' | 'newPerDay' | 'steps'>>) =>
   apiFetch<Sequence>(`/api/outreach/sequences/${id}`, jsonBody(patch, 'PUT'));

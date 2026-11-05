@@ -13,6 +13,8 @@ const sentEmailSchema = new mongoose.Schema({
   conversationId: { type: mongoose.Schema.Types.ObjectId, default: null },
   kind: { type: String, enum: ['sequence', 'reply'], default: 'sequence' },
   step: { type: Number, default: null },
+  // Which kind of first email went (to learn what gets replies): shape, the work it cited, length.
+  meta: { type: new mongoose.Schema({ shape: String, caseTitle: String, words: Number, edited: Boolean }, { _id: false }), default: null },
   from: { type: String, default: '' },
   to: { type: String, required: true, lowercase: true, trim: true },
   subject: { type: String, default: '' },

@@ -39,6 +39,9 @@ function clean(body = {}) {
   return {
     name: text(body.name, 80),
     headline: text(body.headline, 140),
+    portfolioUrl: url(body.portfolioUrl),
+    howIWork: text(body.howIWork, 160),
+    availability: text(body.availability, 80),
     services,
     currency: CURRENCIES.includes(body.currency) ? body.currency : 'INR',
     rate: money(body.rate),
@@ -53,7 +56,7 @@ function clean(body = {}) {
       .filter(p => p.text)
       .slice(0, LIMITS.proof),
     cases: (Array.isArray(body.cases) ? body.cases : [])
-      .map(c => ({ title: text(c && c.title, 120), result: text(c && c.result, 300), url: url(c && c.url) }))
+      .map(c => ({ title: text(c && c.title, 120), result: text(c && c.result, 300), url: url(c && c.url), service: text(c && c.service, 80), client: text(c && c.client, 80) }))
       .filter(c => c.title && c.result)
       .slice(0, LIMITS.cases),
     sources: {

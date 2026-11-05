@@ -54,6 +54,22 @@ const leadSchema = new mongoose.Schema({
   openerSources: { type: [String], default: [] },
   openerState: { type: String, enum: ['none', 'written', 'edited', 'failed', 'skipped'], default: 'none' },
   openerError: { type: String, default: null },
+  // The whole first email (lib/outreach/firstEmail.js), sent as step 1 of a sequence
+  // whose first step uses each lead's own email.
+  firstEmail: {
+    type: new mongoose.Schema({
+      subject: { type: String, default: '', maxlength: 160 },
+      body: { type: String, default: '', maxlength: 4000 },
+      shape: { type: String, enum: ['asked', 'event', null], default: null },
+      caseTitle: { type: String, default: null },   // the piece of work it cites
+      link: { type: String, default: null },
+      sources: { type: [String], default: [] },     // the facts it was built from
+      state: { type: String, enum: ['written', 'edited', 'failed'], default: 'written' },
+      error: { type: String, default: null },
+      at: { type: Date, default: null },
+    }, { _id: false }),
+    default: null,
+  },
 
   status: { type: String, enum: STATUSES, default: 'new' },
   sequenceId: { type: mongoose.Schema.Types.ObjectId, default: null },

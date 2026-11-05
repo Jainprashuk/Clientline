@@ -4,7 +4,7 @@ import SequenceEditor from '../components/SequenceEditor';
 import { useToast } from '../context/ToastContext';
 import { Link } from 'react-router-dom';
 import {
-  loadSequences, createSequence, updateSequence, loadDue, startSending, activeSendRun, SEND_STARTED_EVENT, SEND_FINISHED_EVENT, completeTask, loadConnections, editDueEmail, removeDueLead,
+  loadSequences, createSequence, updateSequence, upgradeSequence, loadDue, startSending, activeSendRun, SEND_STARTED_EVENT, SEND_FINISHED_EVENT, completeTask, loadConnections, editDueEmail, removeDueLead,
   type Sequence, type Variable, type DueSummary, type DueEmail,
 } from '../lib/api';
 
@@ -153,7 +153,7 @@ function DueCard({ due, gmail, onSent, onChanged }: {
 }
 
 /** One sequence, in the prototype's card: status, people, reply rate, and each step's numbers. */
-function SequenceCard({ seq, onEdit, onToggle, busy }: { seq: Sequence; onEdit: () => void; onToggle: () => void; busy: boolean }) {
+function SequenceCard({ seq, onEdit, onToggle, onUpgrade, busy }: { seq: Sequence; onEdit: () => void; onToggle: () => void; onUpgrade: () => void; busy: boolean }) {
   const st = seq.stats;
   const firstSent = st ? st.sent['0'] || 0 : 0;
   const rate = firstSent ? Math.round(((st?.replied || 0) / firstSent) * 100) : 0;
@@ -177,13 +177,22 @@ function SequenceCard({ seq, onEdit, onToggle, busy }: { seq: Sequence; onEdit: 
         </div>
       </div>
       <div className="s-body">
+        {seq.canUpgrade && (
+          <div className="info-box" style={{ marginBottom: 10 }}>
+            <i className="ti ti-sparkles" />
+            <div style={{ flex: 1 }}>
+              <b>A better first email is ready.</b> Instead of one line in a template, each lead gets its own email: what they need, a project of yours that matches, how you’d start, and an offer to send a short plan. Follow-ups change to match.
+            </div>
+            <button className="btn btn-sm btn-primary" type="button" disabled={busy} onClick={onUpgrade}>Switch</button>
+          </div>
+        )}
         {seq.steps.map((s, i) => (
           <div key={i} className="cl-meta" style={{ padding: '7px 0', borderTop: i ? '1px solid var(--border)' : 0 }}>
             <span className="sr-num" aria-hidden="true">{i + 1}</span>
             <span style={{ width: 52 }}>Day {s.dayOffset}</span>
             <span className="cl-source">{s.kind === 'task' ? 'Task for you' : 'Email'}</span>
             <span style={{ color: 'var(--text)', flex: 1, minWidth: 0 }} className="cl-clamp">
-              {s.kind === 'task' ? s.body : i === 0 ? s.subject : `Re: ${seq.steps[0].subject}`}
+              {s.kind === 'task' ? s.body : i === 0 ? (s.useLeadEmail ? 'Each lead’s own email' : s.subject) : seq.steps[0].useLeadEmail ? 'Follow-up, same thread' : `Re: ${seq.steps[0].subject}`}
             </span>
             <span>{st ? `${st.sent[String(i)] || 0} ${s.kind === 'task' ? 'done' : 'sent'}` : ''}{st && s.kind === 'email' ? ` · ${st.repliedAt[String(i)] || 0} replied` : ''}</span>
           </div>
@@ -212,6 +221,13 @@ export default function Outreach() {
   }, []);
   useEffect(() => { load(); }, [load]);
 
+  const upgrade = async (s: Sequence) => {
+    if (!window.confirm(`Switch “${s.name}” to the new first email? People already in it get each lead’s own email for any first email not sent yet — write it in the lead first.`)) return;
+    setBusy(s.id);
+    try { const u = await upgradeSequence(s.id); setSeqs(list => list && list.map(x => (x.id === u.id ? { ...u, stats: x.stats } : x))); load(); toast('Switched.', 'success'); }
+    catch (e: any) { toast(e.message, 'error'); }
+    finally { setBusy(null); }
+  };
   const toggle = async (s: Sequence) => {
     setBusy(s.id);
     try { const u = await updateSequence(s.id, { active: !s.active }); setSeqs(list => list && list.map(x => (x.id === u.id ? u : x))); }
@@ -242,7 +258,7 @@ export default function Outreach() {
       )}
       {due && <DueCard due={due} gmail={gmail} onSent={d => { setDue(d); load(); }} onChanged={d => { setDue(d); load(); }} />}
       {seqs && seqs.map(s => (
-        <SequenceCard key={s.id} seq={s} busy={busy === s.id} onEdit={() => setEditing(s.id)} onToggle={() => toggle(s)} />
+        <SequenceCard key={s.id} seq={s} busy={busy === s.id} onEdit={() => setEditing(s.id)} onToggle={() => toggle(s)} onUpgrade={() => upgrade(s)} />
       ))}
       {editingSeq && (
         <SequenceEditor seq={editingSeq} variables={variables} onClose={() => setEditing(null)}

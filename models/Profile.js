@@ -26,6 +26,11 @@ const profileSchema = new mongoose.Schema({
 
   name: { type: String, default: '', trim: true, maxlength: 80 },
   headline: { type: String, default: '', trim: true, maxlength: 140 },
+  // For the first email: the one link it carries when no case has its own, a line on
+  // how you work, and when you can start. All optional.
+  portfolioUrl: { type: String, default: '', trim: true, maxlength: 300 },
+  howIWork: { type: String, default: '', trim: true, maxlength: 160 },
+  availability: { type: String, default: '', trim: true, maxlength: 80 },
 
   services: { type: [serviceSchema], default: [] },
 
@@ -43,7 +48,10 @@ const profileSchema = new mongoose.Schema({
   exclusions: { type: [String], default: [] },
 
   proof: { type: [{ who: { type: String, maxlength: 80 }, text: { type: String, maxlength: 400 }, _id: false }], default: [] },
-  cases: { type: [{ title: { type: String, maxlength: 120 }, result: { type: String, maxlength: 300 }, url: { type: String, maxlength: 300 }, _id: false }], default: [] },
+  // Past work. `service`: which of your services it proves — the first email cites the
+  // case that matches the lead's service (lib/outreach/cases.js).
+  cases: { type: [{ title: { type: String, maxlength: 120 }, result: { type: String, maxlength: 300 }, url: { type: String, maxlength: 300 },
+    service: { type: String, maxlength: 80, default: '' }, client: { type: String, maxlength: 80, default: '' }, _id: false }], default: [] },
 
   // Which sources run for this account, and how many web searches a day.
   sources: {
