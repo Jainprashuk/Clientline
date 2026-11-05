@@ -35,6 +35,7 @@ export default function Setup() {
   const [name, setName] = useState('');
   const [headline, setHeadline] = useState('');
   const [portfolioUrl, setPortfolioUrl] = useState('');
+  const [phone, setPhone] = useState('');
   const [work, setWork] = useState({ title: '', result: '', url: '', service: '' });
   const [importing, setImporting] = useState(false);
   // From a resume: everything it found goes straight into the steps, to check as you go.
@@ -61,7 +62,7 @@ export default function Setup() {
       if (p.locations.length) setLocations(p.locations);
       if (p.currency) setCurrency(p.currency);
       setRemoteOk(p.remoteOk !== false);
-      setName(p.name || ''); setHeadline(p.headline || ''); setPortfolioUrl(p.portfolioUrl || '');
+      setName(p.name || ''); setHeadline(p.headline || ''); setPortfolioUrl(p.portfolioUrl || ''); setPhone(p.phone || '');
     }).catch(e => toast(e.message, 'error'));
   }, [toast]);
 
@@ -90,7 +91,7 @@ export default function Setup() {
       const cases = work.title.trim() && work.result.trim()
         ? [...base.cases, { ...work, service: work.service || services[0]?.name || '', client: '' }] : base.cases;
       const v = await saveProfile({ ...base, services, currency, minProject, locations, remoteOk, exclusions,
-        name: name.trim(), headline: headline.trim(), portfolioUrl: portfolioUrl.trim(), cases,
+        name: name.trim(), headline: headline.trim(), portfolioUrl: portfolioUrl.trim(), phone: phone.trim(), cases,
         clientTypes: base.clientTypes.length ? base.clientTypes : ['startups'] });
       if (!v.complete) { toast(`Still needed: ${v.missing.join(', ')}`, 'error'); return; }
       toast('Saved. Finding your first leads…', 'success');
@@ -167,9 +168,15 @@ export default function Setup() {
                 <input id="su-headline" type="text" value={headline} maxLength={140} placeholder="Freelance React and Node developer" onChange={e => setHeadline(e.target.value)} />
               </div>
             </div>
-            <div className="form-group">
-              <label className="form-label" htmlFor="su-portfolio">Portfolio or website <span className="cl-row-sub">(optional)</span></label>
-              <input id="su-portfolio" type="url" value={portfolioUrl} maxLength={300} placeholder="https://yourname.dev" onChange={e => setPortfolioUrl(e.target.value)} />
+            <div className="cl-cols">
+              <div className="form-group">
+                <label className="form-label" htmlFor="su-portfolio">Portfolio or website <span className="cl-row-sub">(optional)</span></label>
+                <input id="su-portfolio" type="url" value={portfolioUrl} maxLength={300} placeholder="https://yourname.dev" onChange={e => setPortfolioUrl(e.target.value)} />
+              </div>
+              <div className="form-group">
+                <label className="form-label" htmlFor="su-phone">Phone <span className="cl-row-sub">(optional)</span></label>
+                <input id="su-phone" type="tel" value={phone} maxLength={30} placeholder="+91 98765 43210" onChange={e => setPhone(e.target.value)} />
+              </div>
             </div>
             <div className="form-label" style={{ margin: '14px 0 6px' }}>One project with a result <span className="cl-row-sub">(optional — emails that show real work get more replies)</span></div>
             <div className="cl-cols">

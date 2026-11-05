@@ -7,7 +7,7 @@
  *   node scripts/test-first-email.js
  */
 process.env.AUTH_DB = process.env.AUTH_DB || 'unused';
-const { checkFirstEmail, assemble, nextStep } = require('../lib/outreach/firstEmail');
+const { checkFirstEmail, assemble, nextStep, signatureFor } = require('../lib/outreach/firstEmail');
 const { factsFor } = require('../lib/leads/opener');
 const { rankCases, caseLine } = require('../lib/outreach/cases');
 const { renderStep, whyBlocked, STARTER } = require('../lib/outreach/render');
@@ -89,10 +89,15 @@ ok(email.body.startsWith('Hi Ritika,'), 'greets them by first name');
 ok(email.body.includes('\nhttps://prashuk.dev/work/checkout'), 'the case’s own link under the proof');
 eq((email.body.match(/https?:\/\//g) || []).length, 1, 'exactly one link');
 ok(email.body.includes(nextStep('asked', profile)), 'ends by offering a short plan');
-ok(/Prashuk Jain\nFreelance React & Next.js developer$/.test(email.body), 'signed with name and one line about you');
+ok(/Prashuk Jain\nFreelance React & Next.js developer\nprashuk\.dev$/.test(email.body), 'signed with name, one line about you and the site');
+eq(signatureFor('Prashuk Jain', { headline: 'Full-stack developer', portfolioUrl: 'https://www.jainprashuk.in/', phone: '+91 98765 43210' }),
+  'Prashuk Jain\nFull-stack developer\njainprashuk.in · +91 98765 43210', 'site as a plain name, then the phone');
+eq(signatureFor('Prashuk Jain', {}), 'Prashuk Jain', 'nothing else filled: just the name');
 const noProof = assemble({ ...good, proof: '' }, { ...ctx, proof: null });
-ok(noProof.body.endsWith('Freelance React & Next.js developer · https://prashuk.dev'), 'no proof: the portfolio goes in the signature');
-eq((noProof.body.match(/https?:\/\//g) || []).length, 1, 'still one link');
+ok(noProof.body.endsWith('Freelance React & Next.js developer\nprashuk.dev'), 'no proof: the site is still in the signature');
+eq((noProof.body.match(/https?:\/\//g) || []).length, 0, 'and no link under a missing proof');
+const caseNoUrl = assemble(good, { ...ctx, proof: { ...proof, url: '' } }).body;
+ok(!caseNoUrl.includes('https://prashuk.dev'), 'a project without its own link: no portfolio link repeated under it');
 const words = (email.body.match(/\S+/g) || []).length;
 ok(words >= 60 && words <= 170, `length is in range (${words} words)`);
 ok(nextStep('asked', { availability: 'can start next week' }).startsWith('Can start next week. Want me'), 'availability goes before the question');

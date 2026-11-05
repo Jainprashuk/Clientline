@@ -43,6 +43,8 @@ function clean(body = {}) {
     portfolioUrl: url(body.portfolioUrl),
     howIWork: text(body.howIWork, 160),
     availability: text(body.availability, 80),
+    // Digits and the usual separators only: "+91 98765 43210", "(415) 555-0100".
+    phone: text(body.phone, 30).replace(/[^\d+()\-. ]/g, '').trim(),
     services,
     currency: CURRENCIES.includes(body.currency) ? body.currency : 'INR',
     rate: money(body.rate),

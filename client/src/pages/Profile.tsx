@@ -14,7 +14,7 @@ const CLIENT_TYPES: [string, string][] = [
 const SIZES: [string, string][] = [['1-10', '1–10 people'], ['11-50', '11–50'], ['51-200', '51–200'], ['200+', '200+']];
 
 const EMPTY: ProfileData = {
-  name: '', headline: '', portfolioUrl: '', howIWork: '', availability: '', services: [], currency: 'INR', rate: 0, minProject: 0, clientTypes: [], companySizes: [],
+  name: '', headline: '', portfolioUrl: '', howIWork: '', availability: '', phone: '', services: [], currency: 'INR', rate: 0, minProject: 0, clientTypes: [], companySizes: [],
   locations: [], remoteOk: true, exclusions: [], proof: [], cases: [], sources: { hn: true, news: true, web: true, webPerDay: 5 },
 };
 
@@ -148,8 +148,16 @@ export default function Profile() {
                 <label className="form-label" htmlFor="pf-portfolio">Portfolio or website</label>
                 <input id="pf-portfolio" type="url" value={p.portfolioUrl} maxLength={300} placeholder="https://yourname.dev"
                   onChange={e => set('portfolioUrl', e.target.value)} />
-                <div className="cl-hint">The one link in your email when a piece of work has none of its own.</div>
+                <div className="cl-hint">Under your name in every first email, as “{(p.portfolioUrl || 'https://yourname.dev').replace(/^https?:\/\/(www\.)?/i, '').replace(/\/$/, '')}”.</div>
               </div>
+              <div className="form-group">
+                <label className="form-label" htmlFor="pf-phone">Phone <span className="cl-row-sub">(optional)</span></label>
+                <input id="pf-phone" type="tel" value={p.phone} maxLength={30} placeholder="+91 98765 43210"
+                  onChange={e => set('phone', e.target.value)} />
+                <div className="cl-hint">Next to your site under your name — clients who’d rather call can.</div>
+              </div>
+            </div>
+            <div className="cl-cols">
               <div className="form-group">
                 <label className="form-label" htmlFor="pf-avail">When you can start <span className="cl-row-sub">(optional)</span></label>
                 <input id="pf-avail" type="text" value={p.availability} maxLength={80} placeholder="I can start next week"

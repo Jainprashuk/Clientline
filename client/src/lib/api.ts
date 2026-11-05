@@ -69,6 +69,7 @@ export interface Profile {
   portfolioUrl: string;
   howIWork: string;
   availability: string;
+  phone: string;
   services: Service[];
   currency: 'INR' | 'USD' | 'EUR' | 'GBP';
   rate: number;

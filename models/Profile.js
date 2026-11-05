@@ -31,6 +31,8 @@ const profileSchema = new mongoose.Schema({
   portfolioUrl: { type: String, default: '', trim: true, maxlength: 300 },
   howIWork: { type: String, default: '', trim: true, maxlength: 160 },
   availability: { type: String, default: '', trim: true, maxlength: 80 },
+  // Under your name in the first email, with your site. Optional.
+  phone: { type: String, default: '', trim: true, maxlength: 30 },
 
   services: { type: [serviceSchema], default: [] },
 
