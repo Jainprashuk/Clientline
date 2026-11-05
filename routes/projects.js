@@ -9,7 +9,7 @@ const Deal = require('../models/Deal');
 const Proposal = require('../models/Proposal');
 const Profile = require('../models/Profile');
 const Settings = require('../models/Settings');
-const { contextFor, ensureSeeded, paymentsFor, healthOf, nextPayment, PROJECT_STAGES } = require('../lib/projects/project');
+const { contextFor, ensureSeeded, suggestedChecklist, paymentsFor, healthOf, nextPayment, PROJECT_STAGES } = require('../lib/projects/project');
 const { updateText } = require('../lib/projects/update');
 const { createInvoice, nextAfterPayment } = require('../lib/invoices/create');
 const { splitAmounts } = require('../lib/invoices/math');
@@ -37,6 +37,8 @@ async function full(userId, dealDoc) {
       updates: (deal.project || {}).updates || [],
     },
     health: healthOf(deal), payments, nextPayment: nextPayment(payments),
+    // Suggested from the accepted proposal, not saved until you approve it.
+    suggestedChecklist: suggestedChecklist(deal, ctx.proposal),
     proposal: ctx.proposal ? { id: String(ctx.proposal._id), title: ctx.proposal.title, option: option ? option.name : null, weeks: option ? option.weeks : null } : null,
     paid: ctx.invoices.filter(i => i.status === 'paid').reduce((a, i) => a + i.subtotal, 0),
   };
@@ -81,7 +83,12 @@ router.patch('/:id', async (req, res) => {
     const d = await load(req, res); if (!d) return;
     const q = { _id: d._id, userId: req.userId };
     const now = new Date();
-    if (b.task) {
+    if (b.checklist) {
+      // Approve the suggested checklist (your edited list), or start empty.
+      const tasks = b.checklist.skip ? [] : (Array.isArray(b.checklist.tasks) ? b.checklist.tasks : []).map(x => clean(x, 300)).filter(Boolean).slice(0, 60);
+      if (!b.checklist.skip && !tasks.length) return res.status(400).json({ error: 'Keep at least one step, or start empty.' });
+      await Deal.updateOne(q, { $set: { 'project.checklistReviewed': true }, $push: { 'project.tasks': { $each: tasks.map(text => ({ text, done: false, fromProposal: true })) } } });
+    } else if (b.task) {
       const t = b.task;
       if (!t.id) {
         const text = clean(t.text, 300);

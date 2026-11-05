@@ -25,6 +25,10 @@ export default function ProjectDrawer({ id, onClose, onChanged }: { id: string; 
   const [link, setLink] = useState({ label: '', url: '' });
   const [update, setUpdate] = useState<string | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
+  // The suggested checklist while you review it: your edits stay here until you approve.
+  const [review, setReview] = useState<{ text: string; keep: boolean; why: string }[] | null>(null);
+  const [extra, setExtra] = useState('');
+  useEffect(() => { setReview(p && p.suggestedChecklist ? p.suggestedChecklist.map(x => ({ ...x })) : null); }, [p?.id, !!p?.suggestedChecklist]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => { loadProject(id).then(setP).catch(e => toast(e.message, 'error')); }, [id, toast]);
   const change = async (key: string, body: Record<string, unknown>, done?: string) => {
@@ -88,6 +92,31 @@ export default function ProjectDrawer({ id, onClose, onChanged }: { id: string; 
         </div>
       </div>
 
+      {review ? (
+        <div className="cl-sect" style={{ background: 'var(--canvas)', borderRadius: 12, padding: 14, border: '1px solid var(--accent)' }}>
+          <h3>Suggested checklist <InfoTip text="Made from what the client accepted in the proposal. Nothing is saved until you approve it: untick lines that aren’t real work steps, reword them, add your own." /></h3>
+          <div className="cl-row-sub" style={{ marginBottom: 8 }}>From the accepted proposal{p.proposal?.option ? ` — ${p.proposal.option}` : ''}. Review it, then use it.</div>
+          {review.map((r, i) => (
+            <div key={i} className="cl-meta" style={{ padding: '4px 0', alignItems: 'center', opacity: r.keep ? 1 : 0.6 }}>
+              <input type="checkbox" checked={r.keep} aria-label={`Keep ${r.text}`} onChange={e => setReview(rv => rv && rv.map((x, n) => (n === i ? { ...x, keep: e.target.checked } : x)))} />
+              <input type="text" value={r.text} maxLength={300} style={{ flex: 1 }} onChange={e => setReview(rv => rv && rv.map((x, n) => (n === i ? { ...x, text: e.target.value } : x)))} />
+              {r.why && !r.keep && <span className="cl-row-sub" title={r.why}><i className="ti ti-info-circle" /> not a step?</span>}
+            </div>
+          ))}
+          <form className="cl-meta" style={{ marginTop: 6 }} onSubmit={e => { e.preventDefault(); if (extra.trim()) { setReview(rv => [...(rv || []), { text: extra.trim(), keep: true, why: '' }]); setExtra(''); } }}>
+            <input type="text" value={extra} maxLength={300} placeholder="Add a step — e.g. Set up staging site" onChange={e => setExtra(e.target.value)} />
+            <button className="btn btn-sm" type="submit" disabled={!extra.trim()}>Add</button>
+          </form>
+          <div className="cl-meta" style={{ marginTop: 10 }}>
+            <button className="btn btn-sm" type="button" disabled={!!busy} onClick={() => change('checklist', { checklist: { skip: true } }, 'Starting with an empty checklist.')}>Start empty</button>
+            <span style={{ flex: 1 }} />
+            <button className="btn btn-primary btn-sm" type="button" disabled={!!busy || !review.some(r => r.keep && r.text.trim())}
+              onClick={() => change('checklist', { checklist: { tasks: review.filter(r => r.keep).map(r => r.text) } }, 'Checklist saved.')}>
+              Use this checklist ({review.filter(r => r.keep && r.text.trim()).length})
+            </button>
+          </div>
+        </div>
+      ) : (
       <div className="cl-sect">
         <h3>Checklist <InfoTip text="Starts with what the client accepted in the proposal. Tick things off as you go and add your own steps — the progress bar and the client update are built from this." /></h3>
         {pr.tasks.map(t => (
@@ -105,6 +134,7 @@ export default function ProjectDrawer({ id, onClose, onChanged }: { id: string; 
           <button className="btn btn-sm" type="submit" disabled={!task.trim() || !!busy}>Add</button>
         </form>
       </div>
+      )}
 
       <div className="cl-sect">
         <h3>Payments <InfoTip text="Your payment split, each part with its invoice. Create the next invoice when you reach that point (e.g. the halfway demo), then send it from the invoice." /></h3>

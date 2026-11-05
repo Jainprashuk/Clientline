@@ -402,6 +402,8 @@ export interface Project {
   project: { started: boolean; startedAt: string | null; targetAt: string | null; tasks: ProjectTask[]; links: { label: string; url: string }[]; notes: { id: string; text: string; at: string }[]; updates: { text: string; at: string }[] };
   health: { pct: number; done: number; total: number; state: 'ok' | 'soon' | 'behind' | 'late' | 'delivered' | 'none'; label: string; days?: number };
   payments: ProjectPayment[]; nextPayment: { text: string; tone: 'late' | 'wait' | 'todo' | 'later' | 'ok' } | null;
+  /** Suggested from the accepted proposal, waiting for your review (null once approved or skipped). */
+  suggestedChecklist: { text: string; keep: boolean; why: string }[] | null;
   proposal: { id: string; title: string; option: string | null; weeks: number | null } | null;
   /** Paid so far, before GST (minor units). */
   paid: number;

@@ -38,7 +38,8 @@ const dealSchema = new mongoose.Schema({
   // Once won, the work itself (lib/projects/project.js): a checklist (seeded from the
   // accepted option's items), dates, links, a notes log and the updates you sent.
   project: {
-    started: { type: Boolean, default: false },          // seeded from the proposal
+    started: { type: Boolean, default: false },          // dates set
+    checklistReviewed: { type: Boolean, default: false },  // you approved (or skipped) the suggested checklist
     startedAt: { type: Date, default: null },
     targetAt: { type: Date, default: null },
     tasks: { type: [{ text: { type: String, maxlength: 300 }, done: { type: Boolean, default: false }, doneAt: Date, fromProposal: Boolean }], default: [] },

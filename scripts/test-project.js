@@ -6,7 +6,7 @@
  *   node scripts/test-project.js
  */
 process.env.AUTH_DB = process.env.AUTH_DB || 'unused';
-const { itemsOf, healthOf } = require('../lib/projects/project');
+const { itemsOf, healthOf, suggestedChecklist } = require('../lib/projects/project');
 const { updateText } = require('../lib/projects/update');
 
 let pass = 0, fail = 0;
@@ -20,6 +20,14 @@ const proposal = { options: [
 ] };
 eq(itemsOf(proposal, 2).join(' | '), 'Customer sign-up | Demo slot booking | Admin booking list | Post-launch support', '"All Standard features" expands down the options, no repeats');
 eq(itemsOf(proposal, 0).join(' | '), 'Customer sign-up | Demo slot booking', 'Essentials as is');
+
+const accepted = { ...proposal, acceptedBy: { option: 2 }, options: proposal.options.map((o, i) => (i === 2 ? { ...o, items: [...o.items, 'Two rounds of revisions'] } : o)) };
+const sug = suggestedChecklist({ project: {} }, accepted);
+eq(sug.filter(x => x.keep).map(x => x.text).join(' | '), 'Customer sign-up | Demo slot booking | Admin booking list', 'suggested: real steps ticked');
+eq(sug.filter(x => !x.keep).map(x => x.text).join(' | '), 'Post-launch support | Two rounds of revisions', 'suggested: terms unticked, for you to decide');
+eq(suggestedChecklist({ project: { checklistReviewed: true } }, accepted), null, 'nothing suggested once you’ve reviewed it');
+eq(suggestedChecklist({ project: { tasks: [{ text: 'x' }] } }, accepted), null, 'nothing suggested when there are tasks already');
+eq(suggestedChecklist({ project: {} }, null), null, 'no accepted proposal: nothing to suggest');
 
 const start = Date.now() - 10 * DAY;
 const deal = (tasks, targetIn, stage = 'progress') => ({ stage, project: { startedAt: new Date(start), targetAt: new Date(Date.now() + targetIn * DAY), tasks } });
