@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import Drawer from './Drawer';
+import InfoTip from './InfoTip';
 import { useToast } from '../context/ToastContext';
 import { createProposal, deleteDeal, invoiceRest, loadDeal, loadInvoices, loadProposals, updateDeal, type Invoice, type Proposal, type CallNotes, type Currency, type Deal, type DealDetail, type DealStage } from '../lib/api';
 import { money } from '../lib/money';
@@ -85,13 +86,13 @@ export default function DealDrawer({ id, onClose, onChanged, onDeleted }: {
       <div className="cl-sect">
         <div className="cl-cols">
           <div className="form-group">
-            <label className="form-label" htmlFor="dl-stage">Stage</label>
+            <label className="form-label" htmlFor="dl-stage">Stage <InfoTip text="Where this deal is: Talking → Call booked → Proposal sent → Won → In progress → Delivered → Paid (or Lost). Sending a proposal, an acceptance and the last payment move it for you." /></label>
             <select id="dl-stage" value={form.stage} onChange={e => set({ stage: e.target.value as DealStage })}>
               {(Object.keys(STAGE_LABEL) as DealStage[]).map(s => <option key={s} value={s}>{STAGE_LABEL[s]}</option>)}
             </select>
           </div>
           <div className="form-group">
-            <label className="form-label" htmlFor="dl-value">Value</label>
+            <label className="form-label" htmlFor="dl-value">Value <InfoTip text="What the whole job is worth, before GST. It starts from the budget they mentioned; when they accept a proposal it becomes the price of the option they chose." /></label>
             <div style={{ display: 'flex', gap: 6 }}>
               <select aria-label="Currency" value={form.currency} style={{ width: 82 }} onChange={e => set({ currency: e.target.value as Currency })}>
                 {['INR', 'USD', 'EUR', 'GBP'].map(c => <option key={c} value={c}>{c}</option>)}
@@ -102,18 +103,18 @@ export default function DealDrawer({ id, onClose, onChanged, onDeleted }: {
         </div>
         {form.stage === 'lost' && (
           <div className="form-group">
-            <label className="form-label" htmlFor="dl-lost">Why it was lost</label>
+            <label className="form-label" htmlFor="dl-lost">Why it was lost <InfoTip text="One line on why it didn’t happen. Over time it shows which kinds of leads to skip." /></label>
             <input id="dl-lost" type="text" maxLength={200} value={form.lostReason} placeholder="Went with someone cheaper, project cancelled, no reply…" onChange={e => set({ lostReason: e.target.value })} />
           </div>
         )}
         <div className="form-group">
-          <label className="form-label" htmlFor="dl-next">Your next step</label>
+          <label className="form-label" htmlFor="dl-next">Your next step <InfoTip text="The one thing you’ll do next, shown on the card so nothing stalls: “Send the price”, “Call Thursday 4 pm”." /></label>
           <input id="dl-next" type="text" maxLength={200} value={form.next} placeholder="Send the price · Call Thursday 4 pm · Ask what “urgent” means" onChange={e => set({ next: e.target.value })} />
         </div>
       </div>
 
       <div className="cl-sect">
-        <h3>Proposals</h3>
+        <h3>Proposals <InfoTip text="A page with three options your client opens from a link and accepts by typing their name. Write a proposal drafts it from the thread, your call notes and your profile." /></h3>
         {proposals.map(p => (
           <Link key={p.id} to={`/proposals?p=${p.id}`} className="cl-row-sub" style={{ display: 'block', padding: '4px 0' }}>
             <b style={{ color: 'var(--text)' }}>{p.title}</b> · {p.status === 'accepted' && p.acceptedBy ? `accepted by ${p.acceptedBy.name}` : p.sentAt ? `sent${p.views ? `, opened ${p.views}×` : ', not opened yet'}` : 'draft'}
@@ -131,7 +132,7 @@ export default function DealDrawer({ id, onClose, onChanged, onDeleted }: {
 
       {(invoices.length > 0 || proposals.some(p => p.status === 'accepted')) && (
         <div className="cl-sect">
-          <h3>Invoices</h3>
+          <h3>Invoices <InfoTip text="The deposit invoice is drafted when they accept. Invoice the rest drafts the remaining payments from your split. When all are marked paid, the deal moves to Paid." /></h3>
           {invoices.map(i => (
             <Link key={i.id} to={`/invoices?i=${i.id}`} className="cl-row-sub" style={{ display: 'block', padding: '4px 0' }}>
               <b style={{ color: 'var(--text)' }}>{i.number}</b> · {money(i.total, i.currency)} · {i.status === 'paid' ? 'paid' : i.status === 'void' ? 'cancelled' : i.status === 'draft' ? 'draft — check and send' : i.overdue ? 'overdue' : 'sent'}
@@ -148,7 +149,7 @@ export default function DealDrawer({ id, onClose, onChanged, onDeleted }: {
 
       {d.flags.length > 0 && (
         <div className="cl-sect">
-          <h3>Red flags</h3>
+          <h3>Red flags <InfoTip text="Warning signs spotted by simple rules in what they wrote — unpaid test work, pay after launch, a budget under your minimum. The words that triggered it are shown; you decide if it matters." /></h3>
           {d.flags.map(f => (
             <div key={f.rule} className="cl-note" style={{ marginBottom: 6 }}><b>{f.label}</b>{f.words ? <> — they wrote {f.words}</> : null}</div>
           ))}
@@ -157,7 +158,7 @@ export default function DealDrawer({ id, onClose, onChanged, onDeleted }: {
       )}
 
       <div className="cl-sect">
-        <h3>Call notes</h3>
+        <h3>Call notes <InfoTip text="What you learned from them — budget, timeline, who decides and what done looks like. The proposal is drafted from these, so the more concrete, the better the draft." /></h3>
         {NOTES.map(([k, label, hint]) => (
           <div className="form-group" key={k}>
             <label className="form-label" htmlFor={`dl-n-${k}`}>{label}</label>
@@ -170,10 +171,10 @@ export default function DealDrawer({ id, onClose, onChanged, onDeleted }: {
       <div className="cl-sect">
         <h3>Who</h3>
         <div className="cl-cols">
-          <div className="form-group"><label className="form-label" htmlFor="dl-name">Deal</label><input id="dl-name" type="text" maxLength={120} value={form.name} onChange={e => set({ name: e.target.value })} /></div>
-          <div className="form-group"><label className="form-label" htmlFor="dl-client">Client</label><input id="dl-client" type="text" maxLength={120} value={form.client} onChange={e => set({ client: e.target.value })} /></div>
+          <div className="form-group"><label className="form-label" htmlFor="dl-name">Deal <InfoTip text="A short name for the work, e.g. “Checkout rebuild”." /></label><input id="dl-name" type="text" maxLength={120} value={form.name} onChange={e => set({ name: e.target.value })} /></div>
+          <div className="form-group"><label className="form-label" htmlFor="dl-client">Client <InfoTip text="The company or person paying." /></label><input id="dl-client" type="text" maxLength={120} value={form.client} onChange={e => set({ client: e.target.value })} /></div>
         </div>
-        <div className="form-group"><label className="form-label" htmlFor="dl-email">Email</label><input id="dl-email" type="email" maxLength={200} value={form.email} onChange={e => set({ email: e.target.value })} /></div>
+        <div className="form-group"><label className="form-label" htmlFor="dl-email">Email <InfoTip text="Where proposals and invoices go. Usually filled from their reply." /></label><input id="dl-email" type="email" maxLength={200} value={form.email} onChange={e => set({ email: e.target.value })} /></div>
         {d.lead && <div className="cl-row-sub">Lead: {d.lead.name} · {d.lead.where}{d.lead.postUrl ? <> · <a href={d.lead.postUrl} target="_blank" rel="noopener noreferrer">their post</a></> : null}</div>}
       </div>
 

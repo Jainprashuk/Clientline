@@ -341,7 +341,7 @@ export interface Proposal {
   terms: { split: number[]; rounds: number; validDays: number; note: string };
   proof: { title: string; result: string; url: string } | null;
   status: 'draft' | 'sent' | 'viewed' | 'accepted' | 'declined';
-  sentAt: string | null; views: number; firstViewAt: string | null; lastViewAt: string | null; nudgedAt: string | null;
+  sentAt: string | null; views: number; firstViewAt: string | null; lastViewAt: string | null; nudgedAt: string | null; confirmedAt?: string | null;
   acceptedBy: { name: string; option: number; at: string } | null;
   draftedBy: 'ai' | 'you'; link: string; gaps: string[]; nudge: string | null; expired: boolean; expiresAt: string | null;
   deal?: { id: string; name: string; client: string; person: string; email: string; stage: DealStage };
@@ -390,3 +390,4 @@ export const remindInvoice = (id: string, message: string) => apiFetch<Invoice>(
 export const markInvoicePaid = (id: string, paid: boolean) => apiFetch<Invoice & { dealPaid: boolean }>(`/api/invoices/${id}/paid`, jsonBody({ paid }));
 export const voidInvoice = (id: string) => apiFetch<Invoice>(`/api/invoices/${id}/void`, { method: 'POST' });
 export const invoicePreviewUrl = (id: string) => `${API_BASE}/api/invoices/${id}/preview`;
+export const proposalPdfUrl = (id: string) => `${API_BASE}/api/proposals/${id}/pdf`;

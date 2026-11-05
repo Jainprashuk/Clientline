@@ -15,6 +15,9 @@ const { acceptProposal } = require('../lib/proposals/accept');
 const Invoice = require('../models/Invoice');
 const { renderInvoice } = require('../lib/invoices/page');
 require('../lib/invoices/create');   // registers the deposit invoice on accept
+const { fileName, fromFor } = require('../lib/proposals/confirm');   // registers the thank-you with the PDF
+const { proposalPdf } = require('../lib/proposals/pdf');
+const Deal = require('../models/Deal');
 
 const proposals = express.Router();
 
@@ -41,7 +44,21 @@ proposals.get('/:token', async (req, res) => {
         ...(p.firstViewAt ? {} : { $min: { firstViewAt: now } }),
       });
     }
-    res.send(renderProposal(p, { from: await sender(p.userId) }));
+    res.send(renderProposal(p, { from: await sender(p.userId), pdfHref: `/p/${req.params.token}/pdf` }));
+  } catch (err) {
+    res.status(500).send('Something went wrong. Please try again in a minute.');
+  }
+});
+
+/** The agreed proposal as a PDF — only once it's accepted. */
+proposals.get('/:token/pdf', async (req, res) => {
+  noStore(res);
+  try {
+    const p = await byToken(req.params.token);
+    if (!p || p.status !== 'accepted') return res.status(404).send(notFound());
+    const deal = await Deal.findOne({ _id: p.dealId, userId: p.userId }, { client: 1, person: 1 }).lean();
+    const pdf = await proposalPdf(p, { from: await fromFor(p.userId), client: deal && (deal.client || deal.person) });
+    res.set({ 'Content-Type': 'application/pdf', 'Content-Disposition': `inline; filename="${fileName(p)}"` }).send(pdf);
   } catch (err) {
     res.status(500).send('Something went wrong. Please try again in a minute.');
   }
@@ -55,7 +72,7 @@ proposals.post('/:token', async (req, res) => {
     const b = req.body || {};
     const r = await acceptProposal(p, { name: b.name, option: b.option, hash: b.hash, ipHash: ipHash(req.ip) });
     const fresh = await Proposal.findById(p._id).lean();
-    res.status(r.error ? 400 : 200).send(renderProposal(fresh, { from: await sender(p.userId), error: r.error || '' }));
+    res.status(r.error ? 400 : 200).send(renderProposal(fresh, { from: await sender(p.userId), error: r.error || '', pdfHref: `/p/${req.params.token}/pdf` }));
   } catch (err) {
     res.status(500).send('Something went wrong. Please try again in a minute.');
   }

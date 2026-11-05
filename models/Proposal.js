@@ -40,6 +40,7 @@ const proposalSchema = new mongoose.Schema({
   firstViewAt: { type: Date, default: null },
   lastViewAt: { type: Date, default: null },
   nudgedAt: { type: Date, default: null },
+  confirmedAt: { type: Date, default: null },   // the thank-you with the PDF went out
   acceptedBy: {
     type: new mongoose.Schema({ name: String, option: Number, at: Date, ipHash: String, contentHash: String }, { _id: false }),
     default: null,

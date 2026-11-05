@@ -164,3 +164,8 @@
 .cl-deal .v { font-weight: 700; font-size: 14px; }
 .cl-deal .n { font-size: 13px; margin-top: 2px; }
 .cl-deal .nx { font-size: 12px; color: var(--text2); margin-top: 6px; }
+
+/* ⓘ beside a label (components/InfoTip.tsx). */
+.cl-info { display: inline-flex; align-items: center; margin-left: 4px; color: var(--text3); cursor: help; vertical-align: middle; border-radius: 6px; outline: none; }
+.cl-info:hover, .cl-info:focus-visible { color: var(--accent); }
+.cl-info .ti { font-size: 13px; }

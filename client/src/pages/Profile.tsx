@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import Layout from '../components/Layout';
+import InfoTip from '../components/InfoTip';
 import ChipInput from '../components/ChipInput';
 import ServicePicker from '../components/ServicePicker';
 import ResumeImport from '../components/ResumeImport';
@@ -300,28 +301,28 @@ export default function Profile() {
           <Card id="getting-paid" icon="ti-receipt" title="Proposals & getting paid" sub="What your proposals offer and what your invoices show. Payment is by UPI or your bank — no gateway, no fees.">
             <div className="cl-cols">
               <div className="form-group">
-                <label className="form-label" htmlFor="pf-split">Payment split (%)</label>
+                <label className="form-label" htmlFor="pf-split">Payment split (%) <InfoTip text="How a project is paid, in %: 30 / 40 / 30 = 30% before you start, 40% at the halfway demo, 30% on delivery. Every new proposal starts with this; accepting creates the first invoice from it." /></label>
                 <input id="pf-split" type="text" value={(p.proposalTerms?.split || [30, 40, 30]).join(' / ')} placeholder="30 / 40 / 30"
                   onChange={e => set('proposalTerms', { ...p.proposalTerms, split: e.target.value.split(/[^\d]+/).map(Number).filter(Boolean) })} />
                 <div className="cl-hint">To start / at the halfway demo / on delivery. Must add up to 100.</div>
               </div>
               <div className="form-group">
-                <label className="form-label" htmlFor="pf-rounds">Rounds of changes included</label>
+                <label className="form-label" htmlFor="pf-rounds">Rounds of changes included <InfoTip text="How many rounds of changes your price includes. Extra rounds are quoted separately." /></label>
                 <input id="pf-rounds" type="number" min={0} max={10} value={p.proposalTerms?.rounds ?? 2} onChange={e => set('proposalTerms', { ...p.proposalTerms, rounds: num(e.target.value) })} />
               </div>
               <div className="form-group">
-                <label className="form-label" htmlFor="pf-valid">Proposal open for (days)</label>
+                <label className="form-label" htmlFor="pf-valid">Proposal open for (days) <InfoTip text="How long a client has to accept a proposal after you send it. After that the page shows it as expired, so an old price can’t be accepted months later." /></label>
                 <input id="pf-valid" type="number" min={1} max={90} value={p.proposalTerms?.validDays ?? 14} onChange={e => set('proposalTerms', { ...p.proposalTerms, validDays: num(e.target.value) })} />
               </div>
             </div>
             <div className="cl-cols">
               <div className="form-group">
-                <label className="form-label" htmlFor="pf-upi">UPI ID</label>
+                <label className="form-label" htmlFor="pf-upi">UPI ID <InfoTip text="Your UPI address (like name@okicici, from GPay/PhonePe/Paytm → profile). Rupee invoices show a QR for it with the amount filled in — the client scans and pays, no fees." /></label>
                 <input id="pf-upi" type="text" value={p.billing?.upiId || ''} placeholder="yourname@okicici" onChange={e => set('billing', { ...p.billing, upiId: e.target.value.trim() })} />
                 <div className="cl-hint">Rupee invoices show a QR any UPI app can scan — the amount fills in by itself.</div>
               </div>
               <div className="form-group">
-                <label className="form-label" htmlFor="pf-legal">Name on invoices</label>
+                <label className="form-label" htmlFor="pf-legal">Name on invoices <InfoTip text="Your full legal name or business name, as it should appear on invoices." /></label>
                 <input id="pf-legal" type="text" maxLength={160} value={p.billing?.legalName || ''} placeholder={p.name || 'Your full name or business name'} onChange={e => set('billing', { ...p.billing, legalName: e.target.value })} />
               </div>
             </div>
@@ -331,28 +332,28 @@ export default function Profile() {
             </div>
             <div className="cl-cols">
               <div className="form-group">
-                <label className="form-label" htmlFor="pf-addr">Address on invoices (optional)</label>
+                <label className="form-label" htmlFor="pf-addr">Address on invoices (optional) <InfoTip text="Printed under your name on invoices. Some businesses need it to process payment." /></label>
                 <textarea id="pf-addr" rows={2} maxLength={500} value={p.billing?.address || ''} onChange={e => set('billing', { ...p.billing, address: e.target.value })} />
               </div>
               <div className="form-group">
-                <label className="form-label" htmlFor="pf-tax">PAN or GSTIN (optional)</label>
+                <label className="form-label" htmlFor="pf-tax">PAN or GSTIN (optional) <InfoTip text="Your PAN, or your GSTIN if you’re GST-registered. Printed on invoices; some companies need it for their accounts." /></label>
                 <input id="pf-tax" type="text" maxLength={40} value={p.billing?.taxId || ''} onChange={e => set('billing', { ...p.billing, taxId: e.target.value.toUpperCase() })} />
               </div>
             </div>
             <div className="cl-cols">
               <div className="form-group">
-                <label className="form-label" htmlFor="pf-gst">GST on rupee invoices</label>
+                <label className="form-label" htmlFor="pf-gst">GST on rupee invoices <InfoTip text="Leave at None unless you’re GST-registered (required once you earn over ₹20 lakh a year). If set, it’s added on top of every rupee invoice." /></label>
                 <select id="pf-gst" value={String(p.billing?.gstPercent || 0)} onChange={e => set('billing', { ...p.billing, gstPercent: Number(e.target.value) })}>
                   <option value="0">None — not registered (under ₹20 lakh a year)</option>
                   {[5, 12, 18, 28].map(g => <option key={g} value={g}>{g}%</option>)}
                 </select>
               </div>
               <div className="form-group">
-                <label className="form-label" htmlFor="pf-days">Pay within (days)</label>
+                <label className="form-label" htmlFor="pf-days">Pay within (days) <InfoTip text="How many days after sending an invoice it’s due. Reminders are suggested around the due date." /></label>
                 <input id="pf-days" type="number" min={0} max={90} value={p.billing?.paymentDays ?? 7} onChange={e => set('billing', { ...p.billing, paymentDays: num(e.target.value) })} />
               </div>
               <div className="form-group">
-                <label className="form-label" htmlFor="pf-prefix">Invoice number prefix</label>
+                <label className="form-label" htmlFor="pf-prefix">Invoice number prefix <InfoTip text="Invoices are numbered PREFIX-0001, PREFIX-0002… in order, never reused — as tax records expect." /></label>
                 <input id="pf-prefix" type="text" maxLength={12} value={p.billing?.prefix || 'INV'} onChange={e => set('billing', { ...p.billing, prefix: e.target.value })} />
               </div>
             </div>

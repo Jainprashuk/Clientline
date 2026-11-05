@@ -144,6 +144,22 @@ router.put('/:id', async (req, res) => {
   }
 });
 
+/** The PDF of the proposal (the agreed one once accepted). */
+router.get('/:id/pdf', async (req, res) => {
+  if (!validId(req.params.id)) return res.status(404).send('Not found');
+  try {
+    const p = await Proposal.findOne({ _id: req.params.id, userId: req.userId }).lean();
+    if (!p) return res.status(404).send('Not found');
+    const deal = await Deal.findOne({ _id: p.dealId, userId: req.userId }, { client: 1, person: 1 }).lean();
+    const { proposalPdf } = require('../lib/proposals/pdf');
+    const { fileName, fromFor } = require('../lib/proposals/confirm');
+    const pdf = await proposalPdf(p, { from: await fromFor(req.userId), client: deal && (deal.client || deal.person) });
+    res.set({ 'Content-Type': 'application/pdf', 'Content-Disposition': `inline; filename="${fileName(p)}"`, 'Cache-Control': 'no-store' }).send(pdf);
+  } catch (err) {
+    res.status(500).send(err.message);
+  }
+});
+
 /** Exactly what the client will see (opening it here doesn't count as their view). */
 router.get('/:id/preview', async (req, res) => {
   if (!validId(req.params.id)) return res.status(404).send('Not found');

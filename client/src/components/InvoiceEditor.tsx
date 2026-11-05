@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import Drawer from './Drawer';
+import InfoTip from './InfoTip';
 import { useToast } from '../context/ToastContext';
 import {
   invoiceMessage, invoicePreviewUrl, loadInvoice, markInvoicePaid, remindInvoice, saveInvoice, sendInvoice, voidInvoice,
@@ -107,7 +108,7 @@ export default function InvoiceEditor({ id, onClose, onChanged }: { id: string; 
 
       <fieldset disabled={locked} style={{ border: 0, padding: 0, margin: 0 }}>
         <div className="cl-sect">
-          <h3>Lines</h3>
+          <h3>Lines <InfoTip text="What you’re charging for: description, quantity and rate. The total is the sum of the lines, plus GST if you charge it." /></h3>
           {f.lines.map((l, i) => (
             <div key={i} style={{ display: 'grid', gridTemplateColumns: '1fr 70px 130px auto', gap: 6, marginBottom: 6 }}>
               <input type="text" aria-label="What for" value={l.text} maxLength={300} onChange={e => setLine(i, { text: e.target.value })} />
@@ -119,7 +120,7 @@ export default function InvoiceEditor({ id, onClose, onChanged }: { id: string; 
           <button className="btn btn-sm" type="button" onClick={() => setF({ ...f, lines: [...f.lines, { text: '', qty: '1', rate: '' }] })}><i className="ti ti-plus" /> Add a line</button>
           <div className="cl-meta" style={{ marginTop: 10, justifyContent: 'flex-end' }}>
             {inv.currency === 'INR' && (
-              <label className="cl-meta">GST
+              <label className="cl-meta">GST <InfoTip text="Only if you’re GST-registered (required above ₹20 lakh a year). Added on top of the lines. Set your default in My profile." />
                 <select value={f.gst} style={{ width: 'auto' }} onChange={e => setF({ ...f, gst: e.target.value })}>
                   {['0', '5', '12', '18', '28'].map(g => <option key={g} value={g}>{g === '0' ? 'none' : `${g}%`}</option>)}
                 </select>
@@ -132,17 +133,17 @@ export default function InvoiceEditor({ id, onClose, onChanged }: { id: string; 
         <div className="cl-sect">
           <h3>Client</h3>
           <div className="cl-cols">
-            <div className="form-group"><label className="form-label" htmlFor="iv-name">Name</label><input id="iv-name" type="text" value={f.name} maxLength={160} onChange={e => setF({ ...f, name: e.target.value })} /></div>
-            <div className="form-group"><label className="form-label" htmlFor="iv-email">Email</label><input id="iv-email" type="email" value={f.email} maxLength={200} onChange={e => setF({ ...f, email: e.target.value })} /></div>
+            <div className="form-group"><label className="form-label" htmlFor="iv-name">Name <InfoTip text="Who the invoice is addressed to — their company or name." /></label><input id="iv-name" type="text" value={f.name} maxLength={160} onChange={e => setF({ ...f, name: e.target.value })} /></div>
+            <div className="form-group"><label className="form-label" htmlFor="iv-email">Email <InfoTip text="Where the invoice link goes (in your thread with them when there is one)." /></label><input id="iv-email" type="email" value={f.email} maxLength={200} onChange={e => setF({ ...f, email: e.target.value })} /></div>
           </div>
           <div className="cl-cols">
             <div className="form-group"><label className="form-label" htmlFor="iv-addr">Address (optional)</label><textarea id="iv-addr" rows={2} value={f.address} maxLength={500} onChange={e => setF({ ...f, address: e.target.value })} /></div>
-            <div className="form-group"><label className="form-label" htmlFor="iv-gstin">Their GSTIN (optional)</label><input id="iv-gstin" type="text" value={f.taxId} maxLength={40} onChange={e => setF({ ...f, taxId: e.target.value.toUpperCase() })} /></div>
+            <div className="form-group"><label className="form-label" htmlFor="iv-gstin">Their GSTIN (optional) <InfoTip text="Their GST number, if they’re a GST-registered business and want it on the invoice to claim input credit." /></label><input id="iv-gstin" type="text" value={f.taxId} maxLength={40} onChange={e => setF({ ...f, taxId: e.target.value.toUpperCase() })} /></div>
           </div>
         </div>
         <div className="cl-cols">
-          <div className="form-group"><label className="form-label" htmlFor="iv-due">Due</label><input id="iv-due" type="date" value={f.due} onChange={e => setF({ ...f, due: e.target.value })} /></div>
-          <div className="form-group"><label className="form-label" htmlFor="iv-note">Note (optional)</label><input id="iv-note" type="text" value={f.note} maxLength={600} placeholder="Thank you for the work!" onChange={e => setF({ ...f, note: e.target.value })} /></div>
+          <div className="form-group"><label className="form-label" htmlFor="iv-due">Due <InfoTip text="The date they should pay by. Set from “Pay within (days)” in your profile when you send it. Reminders are suggested around it." /></label><input id="iv-due" type="date" value={f.due} onChange={e => setF({ ...f, due: e.target.value })} /></div>
+          <div className="form-group"><label className="form-label" htmlFor="iv-note">Note (optional) <InfoTip text="A line printed at the bottom of the invoice." /></label><input id="iv-note" type="text" value={f.note} maxLength={600} placeholder="Thank you for the work!" onChange={e => setF({ ...f, note: e.target.value })} /></div>
         </div>
       </fieldset>
       {inv.deal && <div className="cl-row-sub">For the deal <Link to={`/deals?d=${inv.deal.id}`}>{inv.deal.name}</Link></div>}
