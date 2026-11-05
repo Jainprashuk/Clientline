@@ -51,7 +51,7 @@ export default function Work() {
                     <span>{money(p.paid, p.currency)} of {money(p.value, p.currency)} paid</span>
                   </div>
                   {p.nextPayment && <div style={{ fontSize: 12, marginTop: 6, color: TONE[p.nextPayment.tone] }}><i className="ti ti-receipt" /> {p.nextPayment.text}</div>}
-                  {p.project.targetAt && p.stage !== 'paid' && <div className="cl-row-sub" style={{ marginTop: 2 }}>Target {new Date(p.project.targetAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })}</div>}
+                  {p.project?.targetAt && p.stage !== 'paid' && <div className="cl-row-sub" style={{ marginTop: 2 }}>Target {new Date(p.project.targetAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })}</div>}
                 </button>
               ))}
             </div>

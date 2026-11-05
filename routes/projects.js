@@ -28,7 +28,14 @@ async function full(userId, dealDoc) {
   return {
     id: String(deal._id), name: deal.name, client: deal.client, person: deal.person, email: deal.email,
     stage: deal.stage, value: deal.value, currency: deal.currency, next: deal.next, conversationId: deal.conversationId ? String(deal.conversationId) : null,
-    project: { ...(deal.project || {}), tasks: ((deal.project || {}).tasks || []).map(t => ({ ...t, id: String(t._id), _id: undefined })), notes: ((deal.project || {}).notes || []).map(n => ({ ...n, id: String(n._id), _id: undefined })) },
+    // Deals from before projects existed have no lists yet: always send them.
+    project: {
+      started: !!(deal.project && deal.project.started), startedAt: (deal.project && deal.project.startedAt) || null, targetAt: (deal.project && deal.project.targetAt) || null,
+      tasks: ((deal.project || {}).tasks || []).map(t => ({ ...t, id: String(t._id), _id: undefined })),
+      notes: ((deal.project || {}).notes || []).map(n => ({ ...n, id: String(n._id), _id: undefined })),
+      links: (deal.project || {}).links || [],
+      updates: (deal.project || {}).updates || [],
+    },
     health: healthOf(deal), payments, nextPayment: nextPayment(payments),
     proposal: ctx.proposal ? { id: String(ctx.proposal._id), title: ctx.proposal.title, option: option ? option.name : null, weeks: option ? option.weeks : null } : null,
     paid: ctx.invoices.filter(i => i.status === 'paid').reduce((a, i) => a + i.subtotal, 0),

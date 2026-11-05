@@ -35,7 +35,7 @@ export default function ProjectDrawer({ id, onClose, onChanged }: { id: string; 
   };
   if (!p) return <Drawer title="Project" onClose={onClose}><div className="empty-state"><i className="ti ti-loader" />Loading…</div></Drawer>;
 
-  const pr = p.project;
+  const pr = { ...p.project, tasks: p.project?.tasks || [], links: p.project?.links || [], notes: p.project?.notes || [], updates: p.project?.updates || [] };
   const h = p.health;
   return (
     <Drawer title={p.name} subtitle={<>{p.client}{p.proposal?.option ? ` · ${p.proposal.option}` : ''} · {money(p.value, p.currency)}</>} onClose={onClose} width={680}
