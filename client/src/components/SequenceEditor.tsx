@@ -76,7 +76,7 @@ export default function SequenceEditor({ seq, variables, onClose, onSaved, onDel
   );
 
   return (
-    <Drawer width={680} title="Edit sequence" subtitle="Emails go from your Gmail. Later emails reply in the same thread, and every email has an unsubscribe line." onClose={onClose} footer={footer}>
+    <Drawer width={680} title="Edit sequence" subtitle="Emails go from your Gmail. Later emails reply in the same thread. Anyone who replies — even just “no” — gets no more emails." onClose={onClose} footer={footer}>
       <div className="cl-cols">
         <div className="form-group"><label className="form-label" htmlFor="sq-name">Name</label>
           <input id="sq-name" type="text" maxLength={80} value={name} onChange={e => setName(e.target.value)} /></div>

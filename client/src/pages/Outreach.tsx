@@ -22,7 +22,7 @@ function DueEditor({ item, onSaved }: { item: DueEmail; onSaved: (d: DueSummary)
   if (item.blocked) return <div className="cl-note" style={{ margin: '0 0 10px' }}>Won’t send: {item.blocked}. Fix the lead (e.g. its first line) or take it out of the sequence.</div>;
   return (
     <div className="cl-signal" style={{ margin: '0 0 10px' }}>
-      <div className="src" style={{ marginBottom: 6 }}>To {item.email}{item.edited ? ' · your edited version' : ' · from the sequence'} — a personal unsubscribe line is added when it sends</div>
+      <div className="src" style={{ marginBottom: 6 }}>To {item.email}{item.edited ? ' · your edited version' : ' · from the sequence'} — sent exactly as shown</div>
       {item.followUp
         ? <div className="cl-row-sub" style={{ margin: '0 0 6px' }}>Subject: {item.subject} (follow-ups stay in the same thread)</div>
         : <input type="text" aria-label="Subject" maxLength={160} value={subject} onChange={e => setSubject(e.target.value)} style={{ marginBottom: 8 }} />}
