@@ -56,7 +56,7 @@ ok(/number/.test(check({ proof: 'I rebuilt a D2C checkout and mobile conversion 
 ok(/link/.test(check({ approach: 'See https://example.com for how I’d start on the mobile payment step for your sale.' })), 'a link written by the model is rejected');
 ok(/sales words|boilerplate/.test(check({ approach: 'I’d love to help you achieve a seamless checkout before the Diwali sale with my expertise.' })), 'filler is rejected');
 ok(/You posted/.test(check({ ask: 'You posted that you need a freelance React developer for the Brewbox checkout.' })), '"You posted…" opening is rejected');
-ok(/copies/.test(check({ ask: 'We need a freelance React developer to rebuild our checkout before the Diwali sale, I read.' })), 'copying their post word for word is rejected');
+ok(/copies/.test(check({ ask: 'You said we need a freelance React developer to rebuild our checkout before the Diwali sale.' })), 'copying their post word for word is rejected');
 ok(/call|meeting/.test(check({ approach: 'Let’s hop on a call this week and I’ll walk you through the mobile payment step for the sale.' })), 'asking for a call is rejected');
 ok(/subject/.test(check({ subject: 'Quick question!' })), 'a salesy subject is rejected');
 ok(/proof/i.test(check({ proof: '' })), 'leaving out the proof when there is one is rejected');
@@ -64,6 +64,12 @@ ok(/PROOF/.test(check({}, { ...ctx, proof: null })), 'inventing proof when there
 eq(check({ proof: '' }, { ...ctx, proof: null }), null, 'no proof in the profile: the email goes without it');
 ok(/names something/.test(check({ proof: 'I rebuilt a checkout for Nykaa and mobile conversion went up 18% in the first month.' })), 'a client name not in the profile is rejected');
 ok(/fact/.test(check({ used: [] })), 'not saying which fact it used is rejected');
+// What the Iconceptz email did wrong (2026-11-05).
+ok(/full sentence to them/.test(check({ ask: 'create a responsive corporate website with custom integrations and performance optimisation' })), 'a fragment not addressed to them is rejected');
+ok(/first person/.test(check({ proof: 'D2C checkout rebuild — Mobile conversion up 18% in the first month' })), 'the proof pasted as "title — result" is rejected');
+ok(/first person/.test(check({ approach: 'UI/UX design aligned with the brand, then a responsive front-end build for the checkout' })), 'an approach that isn’t "I’d…" is rejected');
+const tidy = assemble({ ...good, ask: 'you need the Brewbox checkout rebuilt before the Diwali sale', approach: 'I’d start with the mobile payment step and ship the rest in stages' }, ctx).body;
+ok(tidy.includes('\n\nYou need the Brewbox checkout rebuilt before the Diwali sale.\n') && tidy.includes('in stages.\n'), 'sentences get a capital and a full stop');
 
 const newsLead = { name: 'Venttup', sourceType: 'trigger', service: 'Web apps', about: 'Venttup raises $3M seed round led by Rainmatter', signals: [{ text: 'Funding news: “Venttup raises $3M seed round led by Rainmatter”', source: 'Google News' }] };
 const newsCtx = { ...ctx, lead: newsLead, facts: factsFor(newsLead), shape: 'event', proof };
