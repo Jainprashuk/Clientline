@@ -342,7 +342,9 @@ export interface Proposal {
   id: string; dealId: string; title: string; intro: string; currency: Currency; options: ProposalOption[];
   terms: { split: number[]; rounds: number; validDays: number; note: string };
   proof: { title: string; result: string; url: string } | null;
-  status: 'draft' | 'sent' | 'viewed' | 'accepted' | 'declined';
+  status: 'draft' | 'sent' | 'viewed' | 'changes' | 'accepted' | 'declined';
+  changeRequests?: { name: string; text: string; at: string }[];
+  versions?: { n: number; sentAt: string; title: string; currency: Currency; options: { name: string; price: number; weeks: number; items: string[]; suggested: boolean }[]; terms: { split: number[]; rounds: number; validDays: number; note: string } }[];
   sentAt: string | null; views: number; firstViewAt: string | null; lastViewAt: string | null; nudgedAt: string | null; confirmedAt?: string | null;
   acceptedBy: { name: string; option: number; at: string } | null;
   draftedBy: 'ai' | 'you'; link: string; gaps: string[]; nudge: string | null; expired: boolean; expiresAt: string | null;
@@ -414,3 +416,12 @@ export const changeProject = (id: string, change: Record<string, unknown>) => ap
 export const projectPaymentInvoice = (id: string, part: number) => apiFetch<{ invoiceId: string }>(`/api/projects/${id}/payments/${part}`, { method: 'POST' });
 export const draftProjectUpdate = (id: string) => apiFetch<{ text: string }>(`/api/projects/${id}/update/draft`, { method: 'POST' });
 export const sendProjectUpdate = (id: string, text: string) => apiFetch<Project>(`/api/projects/${id}/update/send`, jsonBody({ text }));
+
+// ── Today ────────────────────────────────────────────────────────────────────
+export interface TodayItem { kind: string; title: string; detail: string; to: string; tone: 'urgent' | 'good' | 'normal' }
+export interface TodayData {
+  items: TodayItem[];
+  money: { pipeline: Money; won: Money; waiting: Money; paidMonth: Money };
+  counts: { replies: number; newLeads: number; projects: number };
+}
+export const loadToday = () => apiFetch<TodayData>('/api/today');

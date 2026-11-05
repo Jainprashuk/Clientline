@@ -10,7 +10,7 @@ const Deal = require('../models/Deal');
 const Profile = require('../models/Profile');
 const Settings = require('../models/Settings');
 const { draftProposal, gapsIn } = require('../lib/proposals/draft');
-const { renderProposal, isExpired, expiresAt } = require('../lib/proposals/page');
+const { renderProposal, isExpired, expiresAt, contentHash } = require('../lib/proposals/page');
 const { issueToken, linkFor } = require('../lib/docs/token');
 const { sendInThread } = require('../lib/inbox/sendInThread');
 const { appUrl } = require('../lib/emailLayout');
@@ -20,10 +20,18 @@ const validId = (id) => mongoose.isValidObjectId(id);
 const DAY = 86400000;
 const clean = (s, n) => String(s == null ? '' : s).replace(/\s+/g, ' ').trim().slice(0, n);
 
+/** One version as the client saw it. */
+const snapshot = (p, n, sentAt) => ({
+  n, sentAt, title: p.title, intro: p.intro, currency: p.currency,
+  options: p.options.map(o => ({ name: o.name, price: o.price, weeks: o.weeks, items: o.items, suggested: o.suggested })),
+  terms: p.terms, contentHash: contentHash(p),
+});
+
 /** When a nudge would help, and why — never sent on its own. */
 function nudgeFor(p, now = Date.now()) {
   if (!['sent', 'viewed'].includes(p.status) || !p.sentAt || isExpired(p)) return null;
-  const since = Math.max(new Date(p.sentAt).getTime(), p.nudgedAt ? new Date(p.nudgedAt).getTime() : 0);
+  const lastSentAt = p.versions && p.versions.length ? p.versions[p.versions.length - 1].sentAt : p.sentAt;
+  const since = Math.max(new Date(lastSentAt).getTime(), p.nudgedAt ? new Date(p.nudgedAt).getTime() : 0);
   if (!p.views && now - since > 2 * DAY) return 'Not opened in 2 days — a short note brings it back to the top of their inbox.';
   if (p.views && now - since > 3 * DAY) return `Opened ${p.views} time${p.views === 1 ? '' : 's'}, no answer in 3 days — a short follow-up lands well now.`;
   return null;
@@ -137,7 +145,9 @@ router.put('/:id', async (req, res) => {
       }
     }
     if (b.proof === null) $set.proof = null;
-    const u = await Proposal.findOneAndUpdate({ _id: p._id, userId: req.userId }, { $set }, { returnDocument: 'after' }).lean();
+    // Sent before versions were kept: save what the client saw as v1 before it changes.
+    const firstVersion = p.sentAt && !(p.versions && p.versions.length) ? [snapshot(p, 1, p.sentAt)] : null;
+    const u = await Proposal.findOneAndUpdate({ _id: p._id, userId: req.userId }, { $set, ...(firstVersion ? { $push: { versions: { $each: firstVersion } } } : {}) }, { returnDocument: 'after' }).lean();
     res.json(view(u));
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -218,7 +228,15 @@ router.post('/:id/send', async (req, res) => {
       subject: `Proposal: ${p.title}`, text,
     });
     const now = new Date();
-    const u = await Proposal.findOneAndUpdate({ _id: p._id }, { $set: { status: p.status === 'viewed' ? 'viewed' : 'sent', sentAt: p.sentAt || now } }, { returnDocument: 'after' }).lean();
+    // Keep each version you send, so you can see what an earlier one offered.
+    const hash = contentHash(p);
+    const last = p.versions && p.versions.length ? p.versions[p.versions.length - 1] : null;
+    const version = !last || last.contentHash !== hash ? snapshot(p, (p.versions || []).length + 1, now) : null;
+    const u = await Proposal.findOneAndUpdate({ _id: p._id }, {
+      // A new version answers their change request: it's open again ("sent").
+      $set: { status: version || p.status === 'changes' ? 'sent' : p.status === 'viewed' ? 'viewed' : 'sent', sentAt: p.sentAt || now },
+      ...(version ? { $push: { versions: version } } : {}),
+    }, { returnDocument: 'after' }).lean();
     const dealSet = { lastActivityAt: now, next: 'Wait for them to open it — nudge if quiet', ...(sent.conversationId && !deal.conversationId ? { conversationId: sent.conversationId } : {}) };
     const dealUpdate = { $set: dealSet };
     if (['talking', 'call'].includes(deal.stage)) { dealSet.stage = 'proposal'; dealUpdate.$push = { stageHistory: { stage: 'proposal', at: now } }; }

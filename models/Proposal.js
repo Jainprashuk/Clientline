@@ -8,7 +8,7 @@ const mongoose = require('mongoose');
  * acceptedBy is the record of the agreement: who typed their name, which option,
  * when, a hash of their IP, and a SHA-256 of exactly what the page showed.
  */
-const STATUSES = ['draft', 'sent', 'viewed', 'accepted', 'declined'];
+const STATUSES = ['draft', 'sent', 'viewed', 'changes', 'accepted', 'declined'];   // changes: the client asked for changes
 
 const optionSchema = new mongoose.Schema({
   name: { type: String, required: true, maxlength: 60 },
@@ -46,6 +46,18 @@ const proposalSchema = new mongoose.Schema({
     default: null,
   },
   draftedBy: { type: String, enum: ['ai', 'you'], default: 'you' },
+  // What the client asked to change, from the page.
+  changeRequests: { type: [{ name: String, text: { type: String, maxlength: 3000 }, at: Date, _id: false }], default: [] },
+  // Every version you sent (a new one each time you send it changed): what it offered, when.
+  versions: {
+    type: [{
+      n: Number, sentAt: Date, title: String, intro: String, currency: String,
+      options: [{ name: String, price: Number, weeks: Number, items: [String], suggested: Boolean, _id: false }],
+      terms: { split: [Number], rounds: Number, validDays: Number, note: String },
+      contentHash: String, _id: false,
+    }],
+    default: [],
+  },
 }, { timestamps: true });
 
 proposalSchema.index({ userId: 1, dealId: 1, createdAt: -1 });

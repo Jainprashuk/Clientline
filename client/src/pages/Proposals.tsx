@@ -6,7 +6,7 @@ import { loadProposals, type Proposal } from '../lib/api';
 import { money } from '../lib/money';
 import { timeAgo } from '../lib/leads';
 
-export const PROPOSAL_STATUS: Record<Proposal['status'], string> = { draft: 'Draft', sent: 'Sent', viewed: 'Opened', accepted: 'Accepted', declined: 'Declined' };
+export const PROPOSAL_STATUS: Record<Proposal['status'], string> = { draft: 'Draft', sent: 'Sent', viewed: 'Opened', changes: 'Changes asked', accepted: 'Accepted', declined: 'Declined' };
 
 /** Every proposal, newest first: where each stands, and whether a nudge would help. */
 export default function Proposals() {

@@ -42,7 +42,6 @@ Things decided or noticed but parked. Add to it as you go; move an item out when
 
 ## Outreach and Inbox
 
-- **Today page** — replies waiting on you, follow-ups due, tasks, Gmail sends today.
 - **A/B subject lines** per sequence, and per-template reply rates.
 - **Send windows and warm-up** — only send on weekday mornings in the lead's time zone; ramp a new Gmail up slowly.
 - **Track the full path per source and template** — contacted → replied → call → won (leads plan §8), now that replies exist.
@@ -61,11 +60,9 @@ Today, Deals, Proposals, Invoices, Project boards (see `claudemd/clientline-prot
 
 ## Deals, proposals, invoices
 
-- **Tell me when it happens** — no email or bell yet when a client opens or accepts a proposal, or opens an invoice; you see it on Deals / Proposals / Invoices. A short email to yourself (Resend, already set up for sign-in codes) on accept would be the first one.
-- **Money bar on Today** — waiting / overdue / paid this month, once Today exists (Invoices shows it now).
 - **PDF invoices** — today the page prints to PDF from the browser; a real PDF attachment (pdfkit, as Outreach's lib/reportPdf.js) if clients ask.
 - **Payment gateway** (Razorpay / Stripe links) for card payments — UPI QR and bank details cover India for free today.
 - **Automatic reminders** — reminders are suggested and sent by you (manual-first); automate with Inngest later.
-- **Client "decline" with a reason** on the proposal page, and per-deal "Lost" reasons on a chart.
-- **Proposal versions** — editing a sent proposal changes the live page (accepting is refused if it changed since it loaded); keep each sent version.
+- **Client "decline" with a reason** on the proposal page (they can ask for changes now), and per-deal "Lost" reasons on a chart.
+- **Alerts for invoices** — an email to you when an invoice is opened, like proposals.
 

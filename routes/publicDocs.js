@@ -17,6 +17,8 @@ const { renderInvoice } = require('../lib/invoices/page');
 require('../lib/invoices/create');   // registers the deposit invoice on accept
 const { fileName, fromFor } = require('../lib/proposals/confirm');   // registers the thank-you with the PDF
 const { proposalPdf } = require('../lib/proposals/pdf');
+const { onOpened } = require('../lib/proposals/alerts');
+const { askForChanges } = require('../lib/proposals/changes');
 const Deal = require('../models/Deal');
 
 const proposals = express.Router();
@@ -37,6 +39,7 @@ proposals.get('/:token', async (req, res) => {
     const p = await byToken(req.params.token);
     if (!p) return res.status(404).send(notFound());
     if (p.status !== 'accepted') {
+      onOpened(p).catch(() => {});   // an email to you: first open, or back after a quiet spell
       const now = new Date();
       await ProposalView.create({ proposalId: p._id, at: now, ipHash: ipHash(req.ip), ua: String(req.get('user-agent') || '').slice(0, 300) });
       await Proposal.updateOne({ _id: p._id }, {
@@ -44,7 +47,7 @@ proposals.get('/:token', async (req, res) => {
         ...(p.firstViewAt ? {} : { $min: { firstViewAt: now } }),
       });
     }
-    res.send(renderProposal(p, { from: await sender(p.userId), pdfHref: `/p/${req.params.token}/pdf` }));
+    res.send(renderProposal(p, { from: await sender(p.userId), pdfHref: `/p/${req.params.token}/pdf`, changesHref: `/p/${req.params.token}/changes` }));
   } catch (err) {
     res.status(500).send('Something went wrong. Please try again in a minute.');
   }
@@ -64,6 +67,24 @@ proposals.get('/:token/pdf', async (req, res) => {
   }
 });
 
+/** "Ask for changes" from the page. */
+proposals.post('/:token/changes', async (req, res) => {
+  noStore(res);
+  try {
+    const p = await byToken(req.params.token);
+    if (!p) return res.status(404).send(notFound());
+    const r = await askForChanges(p, { name: req.body && req.body.name, text: req.body && req.body.text });
+    const fresh = await Proposal.findById(p._id).lean();
+    const from = await sender(p.userId);
+    res.status(r.error ? 400 : 200).send(renderProposal(fresh, {
+      from, error: r.error || '', pdfHref: `/p/${req.params.token}/pdf`, changesHref: `/p/${req.params.token}/changes`,
+      notice: r.error ? '' : `Thanks — ${from.name || 'they'} got your note and will send an updated proposal to this same link.`,
+    }));
+  } catch (err) {
+    res.status(500).send('Something went wrong. Please try again in a minute.');
+  }
+});
+
 proposals.post('/:token', async (req, res) => {
   noStore(res);
   try {
@@ -72,7 +93,7 @@ proposals.post('/:token', async (req, res) => {
     const b = req.body || {};
     const r = await acceptProposal(p, { name: b.name, option: b.option, hash: b.hash, ipHash: ipHash(req.ip) });
     const fresh = await Proposal.findById(p._id).lean();
-    res.status(r.error ? 400 : 200).send(renderProposal(fresh, { from: await sender(p.userId), error: r.error || '', pdfHref: `/p/${req.params.token}/pdf` }));
+    res.status(r.error ? 400 : 200).send(renderProposal(fresh, { from: await sender(p.userId), error: r.error || '', pdfHref: `/p/${req.params.token}/pdf`, changesHref: `/p/${req.params.token}/changes` }));
   } catch (err) {
     res.status(500).send('Something went wrong. Please try again in a minute.');
   }

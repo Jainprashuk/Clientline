@@ -96,6 +96,9 @@ app.use('/api/deals', require('./routes/deals'));
 app.use('/api/proposals', require('./routes/proposals'));
 app.use('/api/invoices', require('./routes/invoices'));
 app.use('/api/projects', require('./routes/projects'));
+app.use('/api/today', async (req, res) => {
+  try { res.json(await require('./lib/today').today(req.userId)); } catch (err) { res.status(500).json({ error: err.message }); }
+});
 
 // ── Pages ───────────────────────────────────────────────────────────────────
 app.get('/login', (_req, res) => res.sendFile(path.join(__dirname, 'login.html')));

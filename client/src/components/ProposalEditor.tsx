@@ -130,6 +130,16 @@ export default function ProposalEditor({ id, onClose, onChanged, onDeleted }: {
         </div>
       )}
 
+      {p.status === 'changes' && p.changeRequests && p.changeRequests.length > 0 && (
+        <div className="info-box" style={{ marginBottom: 12, borderColor: 'var(--amber)' }}>
+          <i className="ti ti-message-2" />
+          <div style={{ flex: 1 }}>
+            <b>{p.changeRequests[p.changeRequests.length - 1].name} asked for changes</b> · {timeAgo(p.changeRequests[p.changeRequests.length - 1].at)}
+            <div style={{ whiteSpace: 'pre-wrap', marginTop: 4 }}>{p.changeRequests[p.changeRequests.length - 1].text}</div>
+            <div className="cl-row-sub" style={{ marginTop: 6 }}>Edit the options below, Save, then <b>Send again</b> — they get the new version on the same link, and the old one is kept in Versions.</div>
+          </div>
+        </div>
+      )}
       {gaps.length > 0 && !locked && (
         <div className="cl-note" style={{ marginBottom: 10 }}>Fill in before sending: {gaps.map(g => <span key={g} className="cl-gap" style={{ marginRight: 4 }}>{g}</span>)}</div>
       )}
@@ -181,6 +191,28 @@ export default function ProposalEditor({ id, onClose, onChanged, onDeleted }: {
         <div className="form-group"><label className="form-label" htmlFor="pr-note">Anything else on terms (optional) <InfoTip text={TIP.note} /></label><input id="pr-note" type="text" maxLength={600} value={f.note} placeholder="Hosting is billed to you directly" onChange={e => setF({ ...f, note: e.target.value })} /></div>
       </fieldset>
       {p.proof && <div className="cl-row-sub">Shows your work: <b>{p.proof.title}</b> — {p.proof.result}</div>}
+      {p.versions && p.versions.length > 0 && (
+        <div className="cl-sect">
+          <h3>Versions <InfoTip text="Each time you send the proposal with changes, the version the client saw before is kept here — so you can see what an earlier offer said." /></h3>
+          {[...p.versions].reverse().map(v => (
+            <details key={v.n} style={{ marginBottom: 6 }}>
+              <summary className="cl-row-sub" style={{ cursor: 'pointer' }}>
+                <b style={{ color: 'var(--text)' }}>v{v.n}</b> · sent {new Date(v.sentAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })} · {v.options.map(o => `${o.name} ${money(o.price, v.currency)}`).join(' / ')}{v.n === p.versions!.length ? ' · current' : ''}
+              </summary>
+              <div className="cl-row-sub" style={{ padding: '6px 0 0 14px' }}>
+                {v.options.map(o => <div key={o.name}><b>{o.name}</b> — {money(o.price, v.currency)}, {o.weeks} wk: {o.items.join('; ')}</div>)}
+                <div>Split {v.terms.split.join(' / ')} · {v.terms.rounds} rounds{v.terms.note ? ` · ${v.terms.note}` : ''}</div>
+              </div>
+            </details>
+          ))}
+          {p.changeRequests && p.changeRequests.length > 0 && (
+            <div style={{ marginTop: 8 }}>
+              <div className="cl-row-sub" style={{ fontWeight: 650 }}>Changes they asked for</div>
+              {[...p.changeRequests].reverse().map((c, i) => <div key={i} className="cl-msg in" style={{ marginTop: 6 }}><div className="meta">{c.name} · {timeAgo(c.at)}</div>{c.text}</div>)}
+            </div>
+          )}
+        </div>
+      )}
       {p.opens && p.opens.length > 0 && (
         <div className="cl-sect"><h3>Opened</h3>{p.opens.slice(0, 8).map((v, i) => <div key={i} className="cl-row-sub">{new Date(v.at).toLocaleString('en-IN', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}</div>)}</div>
       )}
