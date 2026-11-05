@@ -11,7 +11,7 @@ const Deal = require('../models/Deal');
 const Profile = require('../models/Profile');
 const Settings = require('../models/Settings');
 const { totals } = require('../lib/invoices/math');
-const { createInvoice, invoiceTheRest, settleDeal } = require('../lib/invoices/create');
+const { createInvoice, invoiceTheRest, settleDeal, nextAfterPayment } = require('../lib/invoices/create');
 const { renderInvoice, fmt } = require('../lib/invoices/page');
 const { issueToken, linkFor } = require('../lib/docs/token');
 const { sendInThread } = require('../lib/inbox/sendInThread');
@@ -111,6 +111,7 @@ router.post('/deal/:dealId/rest', async (req, res) => {
   try {
     const r = await invoiceTheRest(req.userId, req.params.dealId);
     if (r.error) return res.status(400).json({ error: r.error });
+    await nextAfterPayment(req.userId, req.params.dealId);
     res.json({ made: r.made.map(i => view(i)) });
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -243,6 +244,7 @@ router.post('/:id/paid', async (req, res) => {
     if (inv.status === 'void') return res.status(409).json({ error: 'It’s cancelled.' });
     const u = await Invoice.findOneAndUpdate({ _id: inv._id }, { $set: paid ? { status: 'paid', paidAt: new Date() } : { status: inv.issuedAt ? 'sent' : 'draft', paidAt: null } }, { returnDocument: 'after' }).lean();
     const settled = paid ? await settleDeal(req.userId, inv.dealId) : false;
+    if (!settled) await nextAfterPayment(req.userId, inv.dealId);
     res.json({ ...view(u), dealPaid: settled });
   } catch (err) {
     res.status(500).json({ error: err.message });

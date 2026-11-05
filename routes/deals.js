@@ -9,6 +9,7 @@ const Lead = require('../models/Lead');
 const Profile = require('../models/Profile');
 const Conversation = require('../models/Conversation');
 const { createDeal, flagsForDeal } = require('../lib/deals/create');
+const { paidByDeal } = require('../lib/invoices/create');
 
 const router = express.Router();
 const validId = (id) => mongoose.isValidObjectId(id);
@@ -27,7 +28,8 @@ router.get('/', async (req, res) => {
       const t = (totals[d.stage] = totals[d.stage] || {});
       t[d.currency] = (t[d.currency] || 0) + (d.value || 0);
     }
-    res.json({ deals: deals.map(view), totals, stages: Deal.STAGES });
+    const paid = await paidByDeal(req.userId, deals.map(d => d._id));
+    res.json({ deals: deals.map(d => ({ ...view(d), paid: paid[String(d._id)] || 0 })), totals, stages: Deal.STAGES });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }

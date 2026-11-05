@@ -109,6 +109,7 @@ export default function Deals() {
                         onDragEnd={() => { setDragging(null); setOver(null); }}
                         onClick={() => open(d.id)}>
                         <div className="v">{d.value ? money(d.value, d.currency) : <span className="cl-row-sub">No value yet</span>}</div>
+                        {d.paid ? <div className="cl-row-sub" style={{ color: 'var(--green)' }}>{money(d.paid, d.currency)}{d.value ? ` of ${money(d.value, d.currency)}` : ''} paid</div> : null}
                         <div className="n">{d.name}</div>
                         <div className="cl-row-sub">{d.client}</div>
                         {d.next && <div className="nx"><i className="ti ti-arrow-right" /> {d.next}</div>}

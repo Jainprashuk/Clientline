@@ -320,6 +320,8 @@ export interface Deal {
   value: number; currency: Currency; stage: DealStage; lostReason: string; next: string;
   flags: DealFlag[]; callNotes: CallNotes; stageHistory: { stage: DealStage; at: string }[];
   lastActivityAt: string; createdAt: string;
+  /** On the board: paid so far, before GST (minor units). */
+  paid?: number;
 }
 export interface DealDetail extends Deal {
   thread: { id: string; subject: string; category: ReplyCategory | null; messages: InboxMessage[] } | null;
